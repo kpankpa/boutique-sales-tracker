@@ -4,9 +4,13 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from '../viewmodels/useSession';
 import { adminTabs, useAdmin } from '../viewmodels/useAdmin';
+import { apiGet } from '../viewmodels/api';
 import { productCategories as defaultCategories, categoryLabel as fallbackCategoryLabel, displayProductName } from '../models/productOptions';
 import { money, dateTime } from './format';
-import { Badge, Button, Card, DataTable, Field, Input, Select, Shell } from './components/ui';
+import { Badge, Button, Card, DataTable, Field, Input, Modal, Select, Shell } from './components/ui';
+import { ScannerModal } from './components/ScannerModal';
+import { ReceiptModal } from './components/ReceiptModal';
+import { QrCode } from './components/QrCode';
 
 const blankProduct = {
   name: '',
@@ -14,6 +18,7 @@ const blankProduct = {
   sku: '',
   size: '',
   sizes: [],
+  barcode: '',
   price: '',
   cost: '',
   openingStock: '',
@@ -39,6 +44,12 @@ export default function AdminView() {
   const [branch, setBranch] = useState(blankBranch);
   const [stockAdjustment, setStockAdjustment] = useState(blankStock);
   const [search, setSearch] = useState('');
+  const [scanTarget, setScanTarget] = useState(null);
+  const [labelProduct, setLabelProduct] = useState(null);
+  const [showLabelSheet, setShowLabelSheet] = useState(false);
+  const [showReceiptScanner, setShowReceiptScanner] = useState(false);
+  const [receiptData, setReceiptData] = useState(null);
+  const [receiptOpen, setReceiptOpen] = useState(false);
 
   useEffect(() => {
     setSearch('');
@@ -82,7 +93,7 @@ export default function AdminView() {
 
   const q = search.trim().toLowerCase();
   const match = (...values) => !q || values.some((value) => String(value ?? '').toLowerCase().includes(q));
-  const filteredProducts = admin.products.filter((row) => match(row.name, row.sku, row.category, row.size, resolveCategoryLabel(row.category)));
+  const filteredProducts = admin.products.filter((row) => match(row.name, row.sku, row.barcode, row.category, row.size, resolveCategoryLabel(row.category)));
   const filteredCategories = categories.filter((row) => match(row.name, row.sizeLabel, ...(row.sizes || [])));
   const filteredStock = admin.stock.filter((row) => match(row.branch_name, row.sku, row.product_name, row.size));
   const filteredCustomers = admin.customers.filter((row) => match(row.name, row.phone, row.email, row.tags));
@@ -120,6 +131,16 @@ export default function AdminView() {
     link.download = `customers-${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  const openReceipt = async (receiptNo) => {
+    try {
+      const sale = await apiGet(`/sales/receipt?no=${encodeURIComponent(receiptNo)}`);
+      setReceiptData(sale);
+      setReceiptOpen(true);
+    } catch (failure) {
+      window.alert(failure.message || 'Receipt not found.');
+    }
   };
 
   const deactivateCustomer = async (row) => {
@@ -238,6 +259,7 @@ export default function AdminView() {
               } else {
                 payload.sku = product.sku;
                 payload.size = product.size;
+                payload.barcode = product.barcode;
               }
               create(admin.createProduct, payload, () => {
                 setProduct(blankProduct);
@@ -254,6 +276,32 @@ export default function AdminView() {
               <Field label="Product name"><Input value={product.name} onChange={(event) => setProduct({ ...product, name: event.target.value })} required /></Field>
               <Field label={product.sizes.length > 0 ? 'Style code' : 'Item code'} hint={product.sizes.length > 0 ? 'Each size becomes CODE-SIZE' : 'Unique code used at the till'}>
                 <Input value={product.sku} onChange={(event) => setProduct({ ...product, sku: event.target.value })} required />
+              </Field>
+              <Field
+                label="Barcode (optional)"
+                hint={product.sizes.length > 0
+                  ? 'Multi-size styles: assign a barcode per size in the table below.'
+                  : 'Manufacturer barcode (EAN/UPC). Scan it or type it.'}
+              >
+                <div className="row">
+                  <Input
+                    value={product.barcode}
+                    disabled={product.sizes.length > 0}
+                    onChange={(event) => setProduct({ ...product, barcode: event.target.value })}
+                    placeholder="e.g. 6001234567890"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={product.sizes.length > 0}
+                    onClick={() => setScanTarget({
+                      title: 'Scan barcode for the new product',
+                      apply: (code) => setProduct((current) => ({ ...current, barcode: code }))
+                    })}
+                  >
+                    Scan
+                  </Button>
+                </div>
               </Field>
               <Field label="Price (GH₵)"><Input type="number" min="0" step="0.01" value={product.price} onChange={(event) => setProduct({ ...product, price: event.target.value })} required /></Field>
               <Field label="Cost (GH₵)"><Input type="number" min="0" step="0.01" value={product.cost} onChange={(event) => setProduct({ ...product, cost: event.target.value })} /></Field>
@@ -343,7 +391,11 @@ export default function AdminView() {
               empty={q ? 'No categories match your search.' : 'No categories yet.'}
             />
           </Card>
-          <Card title="Products" subtitle="Use Edit to change a product right in the table. Codes stay fixed to protect sales history.">
+          <Card
+            title="Products"
+            subtitle="Use Edit to change a product right in the table. Codes stay fixed to protect sales history. Label prints a QR shelf tag."
+            actions={<Button variant="secondary" onClick={() => setShowLabelSheet(true)}>Print label sheet</Button>}
+          >
             <DataTable
               sortable
               onSaveEdit={(row, draft) => admin.updateProduct({
@@ -351,6 +403,7 @@ export default function AdminView() {
                 name: draft.name,
                 category: draft.category,
                 size: draft.size,
+                barcode: draft.barcode,
                 price: draft.price,
                 cost: draft.cost,
                 active: row.active
@@ -359,6 +412,15 @@ export default function AdminView() {
                 { key: 'sku', label: 'Code', render: (row) => row.sku },
                 { key: 'name', label: 'Name', editable: true, render: (row) => row.name },
                 { key: 'size', label: 'Size', editable: true, editValue: (row) => row.size || '', render: (row) => row.size || '—' },
+                { key: 'barcode', label: 'Barcode', editable: true,
+                  editValue: (row) => row.barcode || '',
+                  editRender: (value, onChange) => (
+                    <div className="row">
+                      <Input value={value ?? ''} onChange={(event) => onChange(event.target.value)} aria-label="Edit barcode" placeholder="Scan or type" />
+                      <Button variant="secondary" onClick={() => setScanTarget({ title: 'Scan barcode', apply: (code) => onChange(code) })}>Scan</Button>
+                    </div>
+                  ),
+                  render: (row) => row.barcode || '—' },
                 { key: 'category', label: 'Category', editable: true,
                   editValue: (row) => row.category || 'other',
                   editRender: (value, onChange) => (
@@ -371,18 +433,21 @@ export default function AdminView() {
                 { key: 'cost', label: 'Cost', editable: true, editType: 'number', editValue: (row) => String(row.cost ?? ''), render: (row) => row.cost != null ? money(row.cost) : '—' },
                 { key: 'status', label: 'Status', render: (row) => row.active ? <Badge tone="success">Active</Badge> : <Badge>Inactive</Badge> },
                 { key: 'action', label: '', render: (row, helpers) => inlineActions(row, helpers, (
-                  <Button variant="ghost" onClick={() => {
-                    if (row.active && !window.confirm(`Deactivate ${displayProductName(row.name, row.size)}?`)) return;
-                    admin.updateProduct({
-                      id: row.id,
-                      name: row.name,
-                      category: row.category || 'other',
-                      size: row.size,
-                      price: row.price,
-                      cost: row.cost,
-                      active: !row.active
-                    });
-                  }}>{row.active ? 'Deactivate' : 'Activate'}</Button>
+                  <>
+                    <Button variant="ghost" onClick={() => setLabelProduct(row)}>Label</Button>
+                    <Button variant="ghost" onClick={() => {
+                      if (row.active && !window.confirm(`Deactivate ${displayProductName(row.name, row.size)}?`)) return;
+                      admin.updateProduct({
+                        id: row.id,
+                        name: row.name,
+                        category: row.category || 'other',
+                        size: row.size,
+                        price: row.price,
+                        cost: row.cost,
+                        active: !row.active
+                      });
+                    }}>{row.active ? 'Deactivate' : 'Activate'}</Button>
+                  </>
                 )) }
               ]}
               rows={filteredProducts}
@@ -537,11 +602,19 @@ export default function AdminView() {
       )}
 
       {admin.tab === 'Sales' && (
-        <Card title="All sales">
+        <Card
+          title="All sales"
+          subtitle="Tap a receipt number to view or print it, or scan the QR code on a printed receipt."
+          actions={<Button variant="secondary" onClick={() => setShowReceiptScanner(true)}>Scan receipt</Button>}
+        >
           <DataTable
             sortable
             columns={[
-              { key: 'receipt', label: 'Receipt', render: (row) => row.receipt_no },
+              { key: 'receipt', label: 'Receipt', render: (row) => (
+                <button type="button" className="link-button" onClick={() => openReceipt(row.receipt_no)} aria-label={`Open receipt ${row.receipt_no}`}>
+                  {row.receipt_no}
+                </button>
+              ) },
               { key: 'time', label: 'Time', render: (row) => dateTime(row.created_at) },
               { key: 'branch', label: 'Branch', render: (row) => row.branch_name },
               { key: 'cashier', label: 'Cashier', render: (row) => row.cashier_name },
@@ -740,6 +813,71 @@ export default function AdminView() {
             />
           </Card>
         </div>
+      )}
+      {scanTarget && (
+        <ScannerModal
+          title={scanTarget.title}
+          hint="Point the camera at the barcode, or type it below. The first scan fills the field."
+          onClose={() => setScanTarget(null)}
+          onDetect={(code) => {
+            scanTarget.apply(code);
+            setScanTarget(null);
+          }}
+        />
+      )}
+
+      {labelProduct && (
+        <Modal title="Product label" onClose={() => setLabelProduct(null)}>
+          <div className="print-area label">
+            <QrCode value={labelProduct.barcode || labelProduct.sku} size={150} alt={`QR code for ${labelProduct.sku}`} />
+            <strong>{displayProductName(labelProduct.name, labelProduct.size)}</strong>
+            <span className="label-price">{money(labelProduct.price)}</span>
+            <small>{labelProduct.sku}</small>
+            {labelProduct.barcode && <small>{labelProduct.barcode}</small>}
+          </div>
+          <p className="muted no-print">The QR code contains the barcode (or the item code when there is no barcode), so any scanner can read it at the till.</p>
+          <div className="row no-print">
+            <Button onClick={() => window.print()}>Print label</Button>
+            <Button variant="ghost" onClick={() => setLabelProduct(null)}>Close</Button>
+          </div>
+        </Modal>
+      )}
+
+      {showLabelSheet && (
+        <Modal title={`Label sheet — ${filteredProducts.length} item${filteredProducts.length === 1 ? '' : 's'}`} onClose={() => setShowLabelSheet(false)}>
+          <p className="muted no-print">One label per item, using the current search filter. Print on A4 and cut along the gaps.</p>
+          <div className="print-area label-sheet">
+            {filteredProducts.map((row) => (
+              <div className="label" key={row.id}>
+                <QrCode value={row.barcode || row.sku} size={90} alt={`QR code for ${row.sku}`} />
+                <strong>{displayProductName(row.name, row.size)}</strong>
+                <span className="label-price">{money(row.price)}</span>
+                <small>{row.sku}</small>
+              </div>
+            ))}
+            {!filteredProducts.length && <p className="muted">No products match the current filter.</p>}
+          </div>
+          <div className="row no-print">
+            <Button onClick={() => window.print()} disabled={!filteredProducts.length}>Print sheet</Button>
+            <Button variant="ghost" onClick={() => setShowLabelSheet(false)}>Close</Button>
+          </div>
+        </Modal>
+      )}
+
+      {showReceiptScanner && (
+        <ScannerModal
+          title="Scan a receipt QR code"
+          hint="Point the camera at the QR code on a printed receipt to open it."
+          onClose={() => setShowReceiptScanner(false)}
+          onDetect={async (code) => {
+            setShowReceiptScanner(false);
+            await openReceipt(code);
+          }}
+        />
+      )}
+
+      {receiptOpen && receiptData && (
+        <ReceiptModal receipt={receiptData} onClose={() => setReceiptOpen(false)} />
       )}
     </Shell>
   );

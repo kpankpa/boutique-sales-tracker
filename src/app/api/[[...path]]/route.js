@@ -6,7 +6,7 @@ import { listBranches } from '../../../models/repositories/branches';
 import { listCategories } from '../../../models/repositories/categories';
 import { listProducts } from '../../../models/repositories/products';
 import { listCustomers } from '../../../models/repositories/customers';
-import { listSales } from '../../../models/repositories/sales';
+import { listSales, findSaleByReceipt } from '../../../models/repositories/sales';
 import { listUsers } from '../../../models/repositories/users';
 import { listAudit, listOutboxEvents, listStock } from '../../../models/repositories/activity';
 import { exportCustomers } from '../../../models/repositories/customers';
@@ -28,6 +28,7 @@ import {
   editUser
 } from '../../../models/services/adminService';
 import { recordSale } from '../../../models/services/saleService';
+import { lookupCode } from '../../../models/services/lookupService';
 import { adjustStockFromInput } from '../../../models/services/stockService';
 import { dailySummary, lowStock } from '../../../models/services/reportService';
 
@@ -74,7 +75,9 @@ async function handle(request, context) {
       const databaseUrl = process.env.DATABASE_URL || 'file:data/pos.db';
       const databaseLabel = databaseUrl.startsWith('file:')
         ? 'Local SQLite file'
-        : 'Hosted libSQL database';
+        : /^postgres(ql)?:\/\//i.test(databaseUrl)
+          ? 'Hosted PostgreSQL database'
+          : 'Hosted libSQL database';
       return ok({
         installed,
         database: databaseLabel,
@@ -147,6 +150,10 @@ async function handle(request, context) {
     }
 
     if (key === 'products' && method === 'GET') return ok(await listProducts());
+    if (key === 'lookup' && method === 'GET') {
+      const code = request.nextUrl.searchParams.get('code') || '';
+      return ok(await lookupCode(code));
+    }
     if (key === 'products' && method === 'POST') {
       const denied = requireAdmin(user);
       if (denied) return denied;
@@ -193,6 +200,13 @@ async function handle(request, context) {
     if (key === 'sales' && method === 'POST') {
       const body = await request.json().catch(() => ({}));
       return ok(await recordSale(user, body));
+    }
+    if (key === 'sales/receipt' && method === 'GET') {
+      const receiptNo = String(request.nextUrl.searchParams.get('no') || '').trim();
+      if (!receiptNo) return fail('Provide a receipt number.');
+      const sale = await findSaleByReceipt(receiptNo, branchFilter(request, user));
+      if (!sale) return fail('Receipt not found.', 404);
+      return ok(sale);
     }
 
     if (key === 'reports/daily' && method === 'GET') {

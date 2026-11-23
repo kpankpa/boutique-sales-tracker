@@ -11,12 +11,14 @@ export async function getStockQty(branchId, productId, executor = database) {
 export async function adjustStock(branchId, productId, quantityChange, executor = database) {
   await executor.execute({
     sql: `INSERT INTO stock (branch_id, product_id, qty) VALUES (?, ?, ?)
-          ON CONFLICT(branch_id, product_id) DO UPDATE SET qty = qty + excluded.qty`,
+          ON CONFLICT(branch_id, product_id) DO UPDATE SET qty = stock.qty + excluded.qty`,
     args: [branchId, productId, quantityChange]
   });
 }
 
 export async function listStock({ limit = 200, branchId = null } = {}) {
+  const where = branchId ? 'WHERE s.branch_id = ?' : '';
+  const args = branchId ? [branchId, limit] : [limit];
   const result = await database.execute({
     sql: `SELECT b.id AS branch_id, b.name AS branch_name,
                  p.id AS product_id, p.sku, p.name AS product_name, p.category, p.size,
@@ -24,10 +26,10 @@ export async function listStock({ limit = 200, branchId = null } = {}) {
           FROM stock s
           JOIN branches b ON b.id = s.branch_id
           JOIN products p ON p.id = s.product_id
-          WHERE (? IS NULL OR s.branch_id = ?)
+          ${where}
           ORDER BY b.name ASC, p.name ASC, p.size ASC, p.sku ASC
           LIMIT ?`,
-    args: [branchId, branchId, limit]
+    args
   });
   return result.rows;
 }

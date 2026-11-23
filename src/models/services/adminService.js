@@ -6,11 +6,12 @@ import { findBranchByCode, insertBranch, listBranches, updateBranch } from '../r
 import { findCategoryById, insertCategory, updateCategory } from '../repositories/categories';
 import { addAudit, adjustStock } from '../repositories/activity';
 import { findCustomerByPhone, insertCustomer, setCustomerInactive, updateCustomer } from '../repositories/customers';
-import { findProductBySku, insertProduct, updateProduct } from '../repositories/products';
+import { findProductByBarcode, findProductById, findProductBySku, insertProduct, updateProduct } from '../repositories/products';
 import { findUserById, findUserByUsername, insertUser, updateUser } from '../repositories/users';
 import { normalizeCategory, normalizeSize, sizeToken } from '../productOptions';
 import {
   nonNegativeNumber,
+  normalizeBarcode,
   normalizeCode,
   positiveNumber,
   requireOneOf,
@@ -83,11 +84,33 @@ function normalizeSizes(input) {
   return sizes;
 }
 
-async function createVariant({ sku, name, category, size, price, cost, openingStock, branches }) {
+function isDuplicateBarcode(error) {
+  const message = String(error.message);
+  return message.includes('products.barcode') || message.includes('idx_products_barcode');
+}
+
+async function assertBarcodeFree(barcode, excludeId = null) {
+  if (!barcode) return;
+  const existing = await findProductByBarcode(barcode);
+  if (existing && Number(existing.id) !== Number(excludeId)) {
+    throw new AppError(`That barcode is already used by ${existing.sku}.`, 'BARCODE_EXISTS');
+  }
+}
+
+async function createVariant({ sku, name, category, size, barcode = null, price, cost, openingStock, branches }) {
   if (await findProductBySku(sku)) {
     throw new AppError(`That item code already exists: ${sku}.`);
   }
-  const productId = await insertProduct({ sku, name, category, size, price, cost });
+  await assertBarcodeFree(barcode);
+  let productId;
+  try {
+    productId = await insertProduct({ sku, name, category, size, barcode, price, cost });
+  } catch (error) {
+    if (isDuplicateBarcode(error)) {
+      throw new AppError('That barcode is already used by another item.', 'BARCODE_EXISTS');
+    }
+    throw error;
+  }
   if (openingStock > 0) {
     for (const branch of branches) {
       if (branch.active) await adjustStock(branch.id, productId, openingStock);
@@ -122,20 +145,35 @@ export async function createProduct(input) {
 
   const sku = normalizeCode(input.sku);
   const size = normalizeSize(input.size);
-  const id = await createVariant({ sku, name, category, size, price, cost, openingStock, branches });
+  const barcode = normalizeBarcode(input.barcode);
+  const id = await createVariant({ sku, name, category, size, barcode, price, cost, openingStock, branches });
   return { id, ids: [id], count: 1 };
 }
 
 export async function editProduct(input) {
   const id = Number(input.id);
   if (!Number.isInteger(id) || id <= 0) throw new AppError('Choose a product.');
+  const existing = await findProductById(id);
+  if (!existing) throw new AppError('Choose a product.');
   const name = required(input.name, 'Product name');
   const category = normalizeCategory(input.category);
   const size = normalizeSize(input.size);
   const price = positiveNumber(input.price, 'Price');
   const cost = nonNegativeNumber(input.cost, 'Cost');
   const active = input.active !== false && input.active !== 0;
-  await updateProduct({ id, name, category, size, price, cost, active });
+  // Omitted barcode keeps the current one (quick actions only toggle status).
+  const barcode = input.barcode === undefined
+    ? existing.barcode ?? null
+    : normalizeBarcode(input.barcode);
+  await assertBarcodeFree(barcode, id);
+  try {
+    await updateProduct({ id, name, category, size, barcode, price, cost, active });
+  } catch (error) {
+    if (isDuplicateBarcode(error)) {
+      throw new AppError('That barcode is already used by another item.', 'BARCODE_EXISTS');
+    }
+    throw error;
+  }
   return { id };
 }
 

@@ -1,11 +1,12 @@
-import { database } from '../database';
+import { database, likeOperator } from '../database';
 
 export async function listCustomers(search = '') {
   const term = `%${search.trim()}%`;
+  const like = likeOperator();
   const result = await database.execute({
     sql: `SELECT id, name, phone, email, tags, notes, credit_limit, consent_at, active, created_at
           FROM customers
-          WHERE name LIKE ? OR COALESCE(phone, '') LIKE ?
+          WHERE name ${like} ? OR COALESCE(phone, '') ${like} ?
           ORDER BY id DESC`,
     args: [term, term]
   });

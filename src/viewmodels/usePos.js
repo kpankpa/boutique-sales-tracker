@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiGet, apiPost } from './api';
+import { displayProductName } from '../models/productOptions';
 import {
   addQueuedSale,
   listQueuedSales,
@@ -32,6 +33,7 @@ export function usePos() {
   const [offline, setOffline] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [companyName, setCompanyName] = useState('Slawn POS');
   const syncRun = useRef(null);
 
   const load = useCallback(async () => {
@@ -44,6 +46,7 @@ export function usePos() {
         apiGet('/stock')
       ]);
       setBranches(meta.branches);
+      setCompanyName(meta.companyName || 'Slawn POS');
       setProducts(productList);
       setCustomers(customerList);
       setSales(saleList);
@@ -123,6 +126,16 @@ export function usePos() {
     };
   }, [load, syncQueue]);
 
+  const stockBySku = useMemo(() => {
+    const branchId = branches[0]?.id;
+    const map = {};
+    for (const row of stock) {
+      if (branchId != null && Number(row.branch_id) !== Number(branchId)) continue;
+      map[row.sku] = row;
+    }
+    return map;
+  }, [stock, branches]);
+
   const addProduct = (product) => {
     setReceipt(null);
     setCart((current) => {
@@ -145,15 +158,41 @@ export function usePos() {
     });
   };
 
-  const addByCode = (code) => {
-    const product = products.find((item) => item.sku === code.trim().toUpperCase());
-    if (!product) {
-      setError('That item code is not in the catalogue.');
-      return false;
+  // Resolves a scanned/typed code: barcode first, then item code. Matches the
+  // locally loaded catalogue first so scanning keeps working offline; falls
+  // back to the server for items added since this page loaded.
+  const addByCode = async (rawCode) => {
+    const code = String(rawCode ?? '').trim().toUpperCase();
+    if (!code) return null;
+
+    let product = products.find((item) => item.barcode && String(item.barcode).toUpperCase() === code)
+      ?? products.find((item) => item.sku === code);
+
+    if (!product && typeof navigator !== 'undefined' && navigator.onLine) {
+      try {
+        product = await apiGet(`/lookup?code=${encodeURIComponent(code)}`);
+      } catch (failure) {
+        if (failure.code !== 'CODE_NOT_FOUND' && !(failure instanceof TypeError)) {
+          setError(failure.message);
+          return null;
+        }
+      }
     }
+
+    if (!product) {
+      setError(`No item matches "${code}".`);
+      return null;
+    }
+
+    const record = stockBySku[product.sku];
+    if (record && Number(record.qty) <= 0) {
+      setError(`${displayProductName(product.name, product.size)} is out of stock.`);
+      return null;
+    }
+
     addProduct(product);
     setError('');
-    return true;
+    return product;
   };
 
   const setQuantity = (sku, quantity) => {
@@ -225,11 +264,28 @@ export function usePos() {
 
     try {
       const result = await apiPost('/sales', payload);
-      setReceipt(result);
+      const fullReceipt = {
+        ...result,
+        lines: cart.map((line) => ({
+          sku_snapshot: line.sku,
+          name_snapshot: line.name,
+          size_snapshot: line.size,
+          qty: line.qty,
+          unit_price: line.price,
+          line_total: Number((line.price * line.qty).toFixed(2))
+        })),
+        subtotal: Number(cartTotal.toFixed(2)),
+        discount: Number(discount) || 0,
+        payment_method: paymentMethod,
+        branch_name: branches[0]?.name ?? '',
+        customer_name: customers.find((entry) => String(entry.id) === String(customerId))?.name ?? '',
+        created_at: new Date().toISOString()
+      };
+      setReceipt(fullReceipt);
       setCart([]);
       setDiscount('');
       await load();
-      return result;
+      return fullReceipt;
     } catch (failure) {
       if (failure instanceof TypeError || failure.status === 0) {
         await enqueue(payload);
@@ -271,22 +327,13 @@ export function usePos() {
 
   const conflicts = queue.filter((record) => record.status === 'conflict');
 
-  const stockBySku = useMemo(() => {
-    const branchId = branches[0]?.id;
-    const map = {};
-    for (const row of stock) {
-      if (branchId != null && Number(row.branch_id) !== Number(branchId)) continue;
-      map[row.sku] = row;
-    }
-    return map;
-  }, [stock, branches]);
-
   return {
     products,
     customers,
     branches,
     sales,
     stockBySku,
+    companyName,
     cart,
     cartTotal,
     paymentMethod,

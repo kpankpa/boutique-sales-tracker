@@ -16,12 +16,12 @@ Phase 1–4 of `DEVELOPMENT_PLAN.md` are implemented as a working prototype:
 - Customer records with consent timestamp and credit fields
 - Daily branch summary, low stock, audit log and notification outbox
 
-Notification delivery, barcode labels and GRA E-VAT are not implemented yet.
+Notification delivery and GRA E-VAT are not implemented yet.
 
 ## Stack
 
 - Next.js 16 App Router, React 19
-- libSQL client with SQLite locally and hosted libSQL/Turso on Vercel
+- Dual-driver data layer: SQLite locally, hosted PostgreSQL (Neon) on Vercel; libSQL/Turso still supported
 - Server-side signed-cookie sessions
 - Vanilla CSS design system defined in `UI_UX_GUIDE.md`
 - Dexie for durable IndexedDB queueing of offline sales
@@ -98,17 +98,31 @@ Products have a `category` and optional `size`. Categories include preset sizes:
 
 In Admin → Products, pick a category, enter a style code, select sizes, and save once. The app creates one SKU per size (`STYLE-SIZE`), tracks stock per branch and size, and the POS prompts for size when selling. Opening stock is applied per size.
 
+## Barcode and QR scanning
+
+Every product can carry a manufacturer barcode (EAN/UPC/Code128, or any code of 3–64 letters, digits, dashes, dots or underscores). Barcodes are unique across the catalogue; item codes (SKUs) still work everywhere as a fallback.
+
+**Hardware scanners (USB/Bluetooth keyboard-wedge):** plug the scanner in and scan anywhere on the POS screen — no setup needed. The app detects the fast keystroke burst (≥4 characters within 1.5 s, terminated by Enter/Tab) and adds the item to the cart, even when no input is focused. Scanning into a focused text field fills that field instead. The same works in Admin for assigning barcodes.
+
+**Camera scanning:** tap **Scan with camera** on the POS (or **Scan** next to a barcode field in Admin). The modal uses the browser's native `BarcodeDetector` when available and falls back to a lazy-loaded ZXing decoder (EAN/UPC, Code 128/39, ITF, Codabar and QR). It supports the torch on capable phones, beeps and flashes on each hit, ignores repeat reads of the same code for 2.5 s, and offers manual entry when no camera is available. Camera access requires HTTPS or `localhost`.
+
+**Scanning flow:** a scan resolves barcode first, then SKU. The POS matches its locally loaded catalogue first, so scanning keeps working offline; when online it also asks `GET /api/lookup?code=` for items added since the page loaded. Scanning an out-of-stock item is blocked with a clear message.
+
+**QR labels:** Admin → Products → **Label** prints a shelf tag with a QR code containing the barcode (or the SKU when there is none), the name, size and price. **Print label sheet** prints one label per product using the current search filter, laid out for A4. Any scanner — hardware or camera — reads these labels at the till.
+
+**Receipts:** completing a sale opens a printable receipt with a QR code of the receipt number. Tap any receipt number in POS or Admin → Sales (or **Scan receipt** with the camera) to reopen it. Receipt lookup is branch-scoped for cashiers. Printing uses the browser print dialog; only the receipt/label area prints.
+
 ## Environment variables
 
 | Variable | Purpose |
 |---|---|
-| `DATABASE_URL` | `file:data/pos.db` locally, `libsql://…` on Vercel |
-| `DATABASE_AUTH_TOKEN` | Turso token; leave empty for local file |
+| `DATABASE_URL` | `file:data/pos.db` locally, `postgresql://…` (Neon) on Vercel |
+| `DATABASE_AUTH_TOKEN` | Turso token only; leave empty for SQLite and PostgreSQL |
 | `SESSION_SECRET` | Long random string used to sign session cookies |
 | `LOGIN_MAX_ATTEMPTS` | Failed sign-ins before a 15-minute lockout (default 5) |
 | `AUDIT_RETENTION_DAYS` | Days of audit history to keep (minimum 30, default 365) |
 
-Never commit `.env.local`.
+Never commit `.env.local` or `.env.production.local` (both are gitignored). The Neon connection string and `SESSION_SECRET` live only in those files or in Vercel's environment settings.
 
 ## Security and backups
 
@@ -128,7 +142,13 @@ npm run verify:backup -- backups/<file>.db
 
 `npm run backup` uses `VACUUM INTO`, so the copy is consistent even while the app is running. Backups are ignored by git. Schedule it with cron or Task Scheduler and keep at least seven daily copies off the machine.
 
-Hosted libSQL, using the Turso CLI:
+Hosted PostgreSQL (Neon): Neon keeps automatic point-in-time backups and lets you restore from the dashboard (Branches → Restore). For an extra logical copy:
+
+```bash
+pg_dump "<DATABASE_URL>" > backups/pos-$(date +%F).sql
+```
+
+Legacy hosted libSQL, using the Turso CLI:
 
 ```bash
 turso db shell <database-name> .dump > backups/pos-$(date +%F).sql
@@ -140,7 +160,7 @@ turso db shell <database-name> .dump > backups/pos-$(date +%F).sql
 npm run prune:audit
 ```
 
-This removes audit rows older than `AUDIT_RETENTION_DAYS` (365 days by default, 30-day minimum). Run it monthly from cron, Task Scheduler or CI. For a hosted database, set `DATABASE_URL` and `DATABASE_AUTH_TOKEN` in that runner. Take a backup first, and keep at least 30 days of history for incident review.
+This removes audit rows older than `AUDIT_RETENTION_DAYS` (365 days by default, 30-day minimum). Run it monthly from cron, Task Scheduler or CI. For a hosted database, set `DATABASE_URL` (and `DATABASE_AUTH_TOKEN` for Turso) in that runner. The scripts work with SQLite and PostgreSQL. Take a backup first, and keep at least 30 days of history for incident review.
 
 ### Restore
 
@@ -148,12 +168,12 @@ Stop the app, copy the backup over `data/pos.db`, start the app, sign in and con
 
 ## Deploy to Vercel
 
-1. Create a libSQL/Turso database.
+1. Create a Neon PostgreSQL project and copy the pooled connection string (`…-pooler.…neon.tech/neondb?sslmode=require`).
 2. Create a Vercel project from this repository.
-3. Add `DATABASE_URL`, `DATABASE_AUTH_TOKEN` and a long random `SESSION_SECRET`. Optionally add `LOGIN_MAX_ATTEMPTS` and `AUDIT_RETENTION_DAYS`.
+3. Add `DATABASE_URL` (the Neon string) and a long random `SESSION_SECRET`. Optionally add `LOGIN_MAX_ATTEMPTS` and `AUDIT_RETENTION_DAYS`. No `DATABASE_AUTH_TOKEN` is needed for Neon.
 4. Deploy and open `/install`.
 5. Smoke test: install → sign in → add product → record sale → view daily summary.
-6. Schedule backups and `npm run prune:audit` from a machine or CI job that has the same database variables.
+6. Use Neon's dashboard restore for recovery; schedule `npm run prune:audit` from a machine or CI job that has the same database variables.
 
 `vercel.json` adds baseline security headers.
 
@@ -167,11 +187,13 @@ Stop the app, copy the backup over `data/pos.db`, start the app, sign in and con
 | POST | `/api/auth/logout` | End session |
 | GET | `/api/auth/me` | Current user |
 | GET | `/api/meta` | Branches visible to the user |
-| GET/POST | `/api/products` | Catalogue; POST accepts `category`, `size` or `sizes[]` + `baseSku` for variants |
+| GET/POST | `/api/products` | Catalogue; POST accepts `category`, `size` or `sizes[]` + `baseSku` for variants, and optional `barcode` |
+| GET | `/api/lookup?code=` | Resolve a scanned barcode or SKU to a product |
 | GET/POST | `/api/customers` | Small CRM |
 | GET | `/api/customers/export` | Export customer records (admin) |
 | POST | `/api/customers/deactivate` | Deactivate a customer without losing sale history (admin) |
 | GET/POST | `/api/sales` | Sales history and sale capture |
+| GET | `/api/sales/receipt?no=` | Full receipt with lines, branch-scoped |
 | GET | `/api/reports/daily` | Branch summary |
 | GET | `/api/stock/low` | Low-stock list |
 | GET | `/api/stock` | Stock on hand (admin) |

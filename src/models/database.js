@@ -1,11 +1,16 @@
 import { createClient } from '@libsql/client';
+import pg from 'pg';
 import fs from 'node:fs';
 import path from 'node:path';
 
 const databaseUrl = process.env.DATABASE_URL || 'file:data/pos.db';
 const authToken = process.env.DATABASE_AUTH_TOKEN || undefined;
 
-if (databaseUrl.startsWith('file:')) {
+// PostgreSQL (e.g. Neon) for hosted deployments; libSQL/SQLite for local files.
+export const isPostgres = /^postgres(ql)?:\/\//i.test(databaseUrl);
+export const dialect = isPostgres ? 'postgres' : 'sqlite';
+
+if (!isPostgres && databaseUrl.startsWith('file:')) {
   const filePath = databaseUrl.slice(5).replace(/^\.\//, '');
   const directory = path.dirname(filePath);
   if (directory && directory !== '.' && !fs.existsSync(directory)) {
@@ -13,7 +18,138 @@ if (databaseUrl.startsWith('file:')) {
   }
 }
 
-export const database = createClient({ url: databaseUrl, authToken });
+// --- PostgreSQL adapter -----------------------------------------------------
+// Emulates the libSQL executor interface ({ rows, lastInsertRowid }, batch)
+// so repositories can stay dialect-agnostic.
+
+function convertPlaceholders(sql) {
+  let index = 0;
+  let inString = false;
+  let out = '';
+  for (const ch of sql) {
+    if (ch === "'") {
+      inString = !inString;
+      out += ch;
+    } else if (ch === '?' && !inString) {
+      index += 1;
+      out += `$${index}`;
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
+
+function formatUtc(date) {
+  return date.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+function normalizeRow(row) {
+  const out = {};
+  for (const [key, value] of Object.entries(row)) {
+    // Match SQLite's CURRENT_TIMESTAMP text format so dates behave the same.
+    out[key] = value instanceof Date ? formatUtc(value) : value;
+  }
+  return out;
+}
+
+function prepareSql(sql) {
+  let text = convertPlaceholders(sql);
+  if (/^\s*INSERT\b/i.test(text) && !/\bRETURNING\b/i.test(text)) {
+    text += ' RETURNING *';
+  }
+  return text;
+}
+
+function makePgExecutor(queryable, pool) {
+  const executor = {
+    async execute(statement) {
+      const { sql, args = [] } = typeof statement === 'string' ? { sql: statement } : statement;
+      const result = await queryable.query(prepareSql(sql), args);
+      const rows = result.rows.map(normalizeRow);
+      return {
+        rows,
+        rowsAffected: result.rowCount ?? 0,
+        lastInsertRowid: rows[0]?.id ?? null
+      };
+    },
+    async batch(statements) {
+      if (queryable === pool) {
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+          const results = [];
+          for (const statement of statements) {
+            results.push(await makePgExecutor(client, pool).execute(statement));
+          }
+          await client.query('COMMIT');
+          return results;
+        } catch (error) {
+          await client.query('ROLLBACK').catch(() => {});
+          throw error;
+        } finally {
+          client.release();
+        }
+      }
+      const results = [];
+      for (const statement of statements) {
+        results.push(await executor.execute(statement));
+      }
+      return results;
+    }
+  };
+  return executor;
+}
+
+let pool = null;
+let database;
+
+if (isPostgres) {
+  // COUNT(*) and other int8 results arrive as strings by default; ids/counts
+  // here are always small enough to be safe numbers.
+  pg.types.setTypeParser(20, (value) => Number(value));
+  pool = new pg.Pool({
+    connectionString: databaseUrl,
+    max: 5,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 15000
+  });
+  database = makePgExecutor(pool, pool);
+} else {
+  database = createClient({ url: databaseUrl, authToken });
+}
+
+export { database };
+
+// --- Dialect helpers --------------------------------------------------------
+
+export function likeOperator() {
+  return isPostgres ? 'ILIKE' : 'LIKE';
+}
+
+export function todayClause(column) {
+  return isPostgres
+    ? `(${column} AT TIME ZONE 'UTC')::date = (NOW() AT TIME ZONE 'UTC')::date`
+    : `date(${column}) = date('now')`;
+}
+
+export function olderThanOneDayClause(column) {
+  return isPostgres
+    ? `${column} < NOW() - INTERVAL '1 day'`
+    : `${column} < datetime('now', '-1 day')`;
+}
+
+export function insertIgnoreSql(table, columns, placeholders, conflictTarget) {
+  return isPostgres
+    ? `INSERT INTO ${table} (${columns}) VALUES (${placeholders}) ON CONFLICT (${conflictTarget}) DO NOTHING`
+    : `INSERT OR IGNORE INTO ${table} (${columns}) VALUES (${placeholders})`;
+}
+
+function isDuplicateColumn(error) {
+  return String(error.message).includes('duplicate column') || error.code === '42701';
+}
+
+// --- Schema -----------------------------------------------------------------
 
 const schema = [
   `CREATE TABLE IF NOT EXISTS settings (
@@ -52,6 +188,7 @@ const schema = [
     name TEXT NOT NULL,
     category TEXT NOT NULL DEFAULT 'other',
     size TEXT,
+    barcode TEXT,
     price REAL NOT NULL,
     cost REAL NOT NULL DEFAULT 0,
     active INTEGER NOT NULL DEFAULT 1,
@@ -147,16 +284,23 @@ const schema = [
   `CREATE INDEX IF NOT EXISTS idx_outbox_status ON notification_outbox(status)`
 ];
 
+function toPostgresDdl(statement) {
+  return statement
+    .replace(/INTEGER PRIMARY KEY AUTOINCREMENT/g, 'INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY')
+    .replace(/\bREAL\b/g, 'DOUBLE PRECISION')
+    .replace(/TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP/g, 'TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP');
+}
+
 export async function createSchema() {
   for (const statement of schema) {
-    await database.execute(statement);
+    await database.execute(isPostgres ? toPostgresDdl(statement) : statement);
   }
 
   // Databases created before client references were added need the column.
   try {
     await database.execute('ALTER TABLE sales ADD COLUMN client_ref TEXT');
   } catch (error) {
-    if (!String(error.message).includes('duplicate column')) throw error;
+    if (!isDuplicateColumn(error)) throw error;
   }
 
   await database.execute(
@@ -166,14 +310,20 @@ export async function createSchema() {
   for (const statement of [
     "ALTER TABLE products ADD COLUMN category TEXT NOT NULL DEFAULT 'other'",
     'ALTER TABLE products ADD COLUMN size TEXT',
+    'ALTER TABLE products ADD COLUMN barcode TEXT',
     'ALTER TABLE sale_lines ADD COLUMN size_snapshot TEXT'
   ]) {
     try {
       await database.execute(statement);
     } catch (error) {
-      if (!String(error.message).includes('duplicate column')) throw error;
+      if (!isDuplicateColumn(error)) throw error;
     }
   }
+
+  // One barcode per item; items without a barcode are unconstrained.
+  await database.execute(
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode) WHERE barcode IS NOT NULL'
+  );
 
   const defaultCategories = [
     ['shoes', 'Shoes', 'Shoe size', JSON.stringify(['38', '39', '40', '41', '42', '43', '44', '45', '46'])],
@@ -184,8 +334,7 @@ export async function createSchema() {
   ];
   for (const [id, name, sizeLabel, sizesJson] of defaultCategories) {
     await database.execute({
-      sql: `INSERT OR IGNORE INTO categories (id, name, size_label, sizes_json)
-            VALUES (?, ?, ?, ?)`,
+      sql: insertIgnoreSql('categories', 'id, name, size_label, sizes_json', '?, ?, ?, ?', 'id'),
       args: [id, name, sizeLabel, sizesJson]
     });
   }
@@ -204,6 +353,21 @@ export function ensureSchema() {
 }
 
 export async function withTransaction(work) {
+  if (isPostgres) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await work(makePgExecutor(client, pool));
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   const transaction = await database.transaction('write');
   try {
     const result = await work(transaction);

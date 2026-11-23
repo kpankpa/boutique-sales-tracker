@@ -42,7 +42,8 @@ function buildLines(items) {
 }
 
 function isDuplicateReference(error) {
-  return String(error.message).includes('sales.client_ref');
+  const message = String(error.message);
+  return message.includes('sales.client_ref') || message.includes('idx_sales_client_ref');
 }
 
 export async function recordSale(user, input) {

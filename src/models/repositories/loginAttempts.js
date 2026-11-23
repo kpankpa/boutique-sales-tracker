@@ -1,4 +1,4 @@
-import { database } from '../database';
+import { database, olderThanOneDayClause } from '../database';
 
 export async function findLoginAttempt(key) {
   const result = await database.execute({
@@ -29,6 +29,6 @@ export async function clearLoginAttempt(key) {
 
 export async function pruneLoginAttempts() {
   await database.execute(
-    "DELETE FROM login_attempts WHERE updated_at < datetime('now', '-1 day')"
+    `DELETE FROM login_attempts WHERE ${olderThanOneDayClause('updated_at')}`
   );
 }

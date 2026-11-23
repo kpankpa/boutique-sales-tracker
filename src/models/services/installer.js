@@ -1,4 +1,4 @@
-import { createSchema, database } from '../database';
+import { createSchema, database, insertIgnoreSql } from '../database';
 import { AppError } from '../errors';
 import { hashPassword } from '../security';
 import { isInstalled, setSetting } from '../repositories/settings';
@@ -90,8 +90,7 @@ async function loadDemoData(branchId) {
   const products = await database.execute('SELECT id FROM products ORDER BY id ASC');
   for (const product of products.rows) {
     await database.execute({
-      sql: `INSERT OR IGNORE INTO stock (branch_id, product_id, qty, low_at)
-            VALUES (?, ?, ?, ?)`,
+      sql: insertIgnoreSql('stock', 'branch_id, product_id, qty, low_at', '?, ?, ?, ?', 'branch_id, product_id'),
       args: [branchId, product.id, 12, 3]
     });
   }

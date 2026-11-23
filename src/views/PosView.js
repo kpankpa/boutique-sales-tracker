@@ -4,9 +4,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from '../viewmodels/useSession';
 import { usePos } from '../viewmodels/usePos';
+import { useBarcodeScanner } from '../viewmodels/useBarcodeScanner';
+import { apiGet } from '../viewmodels/api';
 import { categoryLabel, displayProductName } from '../models/productOptions';
 import { money, dateTime } from './format';
 import { Badge, Button, Card, DataTable, Field, Input, Modal, Select, Shell } from './components/ui';
+import { ScannerModal } from './components/ScannerModal';
+import { ReceiptModal } from './components/ReceiptModal';
 
 const FAVORITES_KEY = 'slawn.pos.favorites';
 const RECENT_KEY = 'slawn.pos.recent';
@@ -58,12 +62,55 @@ export default function PosView() {
   const [removedLine, setRemovedLine] = useState(null);
   const [favorites, setFavorites] = useState(() => readStoredList(FAVORITES_KEY));
   const [recent, setRecent] = useState(() => readStoredList(RECENT_KEY));
+  const [showScanner, setShowScanner] = useState(false);
+  const [scannerMode, setScannerMode] = useState('sale');
+  const [scanFlash, setScanFlash] = useState(null);
+  const [receiptData, setReceiptData] = useState(null);
+  const [receiptOpen, setReceiptOpen] = useState(false);
 
   useEffect(() => {
     if (!removedLine) return;
     const timer = window.setTimeout(() => setRemovedLine(null), 5000);
     return () => window.clearTimeout(timer);
   }, [removedLine]);
+
+  useEffect(() => {
+    if (!scanFlash) return;
+    const timer = window.setTimeout(() => setScanFlash(null), 2600);
+    return () => window.clearTimeout(timer);
+  }, [scanFlash]);
+
+  const rememberRecent = (key) => {
+    setRecent((current) => {
+      const next = [key, ...current.filter((entry) => entry !== key)].slice(0, 8);
+      writeStoredList(RECENT_KEY, next);
+      return next;
+    });
+  };
+
+  // Hardware scanner (keyboard wedge) and camera scans both land here.
+  const handleScan = async (rawCode) => {
+    const product = await pos.addByCode(rawCode);
+    setCode('');
+    setProductSearch('');
+    if (product) {
+      rememberRecent(`${product.category || 'other'}||${product.name}`);
+      setScanFlash({ message: `Added ${displayProductName(product.name, product.size)}`, tone: 'success' });
+    }
+  };
+
+  const openReceipt = async (receiptNo) => {
+    try {
+      const sale = await apiGet(`/sales/receipt?no=${encodeURIComponent(receiptNo)}`);
+      setReceiptData(sale);
+      setReceiptOpen(true);
+    } catch (failure) {
+      setScanFlash({ message: failure.message || 'Receipt not found.', tone: 'error' });
+    }
+  };
+
+  const anyModalOpen = showCustomer || showConflicts || Boolean(sizeGroup) || showScanner || receiptOpen;
+  useBarcodeScanner(handleScan, { enabled: !anyModalOpen });
 
   const productGroups = useMemo(() => {
     const groups = new Map();
@@ -116,11 +163,7 @@ export default function PosView() {
     writeStoredList(FAVORITES_KEY, next);
   };
 
-  const recordRecent = (key) => {
-    const next = [key, ...recent.filter((entry) => entry !== key)].slice(0, 8);
-    setRecent(next);
-    writeStoredList(RECENT_KEY, next);
-  };
+  const recordRecent = (key) => rememberRecent(key);
 
   const chooseGroup = (group) => {
     recordRecent(group.key);
@@ -143,12 +186,20 @@ export default function PosView() {
     return null;
   };
 
-  const addCode = (event) => {
+  const addCode = async (event) => {
     event.preventDefault();
-    if (pos.addByCode(code)) {
-      const product = pos.products.find((item) => item.sku === code.trim().toUpperCase());
-      if (product) recordRecent(`${product.category || 'other'}||${product.name}`);
+    const product = await pos.addByCode(code);
+    if (product) {
+      recordRecent(`${product.category || 'other'}||${product.name}`);
       setCode('');
+    }
+  };
+
+  const completeSale = async () => {
+    const result = await pos.submit();
+    if (result?.receiptNo) {
+      setReceiptData(result);
+      setReceiptOpen(true);
     }
   };
 
@@ -204,7 +255,11 @@ export default function PosView() {
   ];
 
   const saleColumns = [
-    { key: 'receipt', label: 'Receipt', render: (sale) => sale.receipt_no },
+    { key: 'receipt', label: 'Receipt', render: (sale) => (
+      <button type="button" className="link-button" onClick={() => openReceipt(sale.receipt_no)} aria-label={`Open receipt ${sale.receipt_no}`}>
+        {sale.receipt_no}
+      </button>
+    ) },
     { key: 'time', label: 'Time', render: (sale) => dateTime(sale.created_at) },
     { key: 'branch', label: 'Branch', render: (sale) => sale.branch_name },
     { key: 'total', label: 'Total', render: (sale) => money(sale.total) }
@@ -239,7 +294,8 @@ export default function PosView() {
       {pos.error && <div className="alert alert-error" role="alert">{pos.error}</div>}
       {pos.receipt?.receiptNo && (
         <div className="alert alert-success" role="status">
-          Sale saved — {pos.receipt.receiptNo} — {money(pos.receipt.total)}
+          <span>Sale saved — {pos.receipt.receiptNo} — {money(pos.receipt.total)}</span>
+          <Button variant="ghost" onClick={() => { setReceiptData(pos.receipt); setReceiptOpen(true); }}>View receipt</Button>
         </div>
       )}
       {pos.receipt?.queued && <div className="alert alert-warn">Saved on this device. It will sync when the internet returns.</div>}
@@ -249,9 +305,18 @@ export default function PosView() {
           <Button variant="secondary" onClick={() => { pos.restoreLine(removedLine); setRemovedLine(null); }}>Undo</Button>
         </div>
       )}
+      {scanFlash && (
+        <div className={scanFlash.tone === 'error' ? 'toast toast-error' : 'toast'} role="status">
+          <span>{scanFlash.message}</span>
+        </div>
+      )}
 
       <div className="pos-grid">
-        <Card title="Products" subtitle="Tap an item or type its code. Star pins favourites to the top.">
+        <Card
+          title="Products"
+          subtitle="Tap an item, type its code, or scan a barcode. Star pins favourites to the top."
+          actions={<Button variant="secondary" onClick={() => { setScannerMode('sale'); setShowScanner(true); }}>Scan with camera</Button>}
+        >
           <form className="row" onSubmit={addCode}>
             <Input value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="Item code" autoFocus aria-label="Item code" />
             <Button type="submit">Add</Button>
@@ -340,14 +405,18 @@ export default function PosView() {
               <span>Total</span>
               <strong>{money(Math.max(pos.cartTotal - (Number(pos.discount) || 0), 0))}</strong>
             </div>
-            <Button disabled={pos.busy || !pos.cart.length} onClick={pos.submit}>
+            <Button disabled={pos.busy || !pos.cart.length} onClick={completeSale}>
               {pos.busy ? 'Saving…' : 'Complete sale'}
             </Button>
           </div>
         </Card>
       </div>
 
-      <Card title="Recent sales" subtitle="Latest sales for this branch.">
+      <Card
+        title="Recent sales"
+        subtitle="Latest sales for this branch. Tap a receipt to view or print it."
+        actions={<Button variant="secondary" onClick={() => { setScannerMode('receipt'); setShowScanner(true); }}>Scan receipt</Button>}
+      >
         <DataTable columns={saleColumns} rows={pos.sales} empty="No sales recorded yet." />
       </Card>
 
@@ -464,6 +533,26 @@ export default function PosView() {
             })}
           </div>
         </Modal>
+      )}
+      {showScanner && (
+        <ScannerModal
+          title={scannerMode === 'receipt' ? 'Scan a receipt QR code' : 'Scan items'}
+          hint={scannerMode === 'receipt'
+            ? 'Point the camera at the QR code on a printed receipt to open it.'
+            : 'Point the camera at a barcode or QR code. Each scan adds the item to the sale.'}
+          onClose={() => setShowScanner(false)}
+          onDetect={scannerMode === 'receipt'
+            ? async (code) => { setShowScanner(false); await openReceipt(code); }
+            : handleScan}
+        />
+      )}
+
+      {receiptOpen && receiptData && (
+        <ReceiptModal
+          receipt={receiptData}
+          companyName={pos.companyName}
+          onClose={() => setReceiptOpen(false)}
+        />
       )}
     </Shell>
   );

@@ -956,3 +956,234 @@ a.btn:focus-visible {
     flex-wrap: wrap;
   }
 }
+
+/* --- Scanning ---------------------------------------------------------- */
+
+.scan-stage {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0c1512;
+  min-height: 240px;
+  display: grid;
+  place-items: center;
+}
+
+.scan-video {
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  display: block;
+}
+
+.scan-frame {
+  position: absolute;
+  inset: 14% 10%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 12px;
+  box-shadow: 0 0 0 2000px rgba(12, 21, 18, 0.35);
+  pointer-events: none;
+}
+
+.scan-stage.scan-flash .scan-frame {
+  border-color: var(--success);
+  box-shadow: 0 0 0 2000px rgba(22, 163, 74, 0.25);
+}
+
+.scan-status {
+  position: absolute;
+  inset: auto 0 0;
+  margin: 0;
+  padding: 10px 14px;
+  background: rgba(12, 21, 18, 0.75);
+  color: #f4fbf8;
+  font-size: 13px;
+  text-align: center;
+}
+
+.scan-status-error {
+  background: rgba(127, 29, 29, 0.85);
+}
+
+.scan-hint {
+  margin: 0;
+  font-size: 13px;
+  flex: 1;
+}
+
+.scan-last {
+  margin: 0;
+  font-size: 13px;
+  color: var(--brand);
+}
+
+.toast-error {
+  background: #7f1d1d;
+}
+
+.link-button {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--brand);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.link-button:hover {
+  color: var(--brand-soft);
+}
+
+/* --- QR labels ---------------------------------------------------------- */
+
+.qr-code {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.qr-placeholder {
+  background: repeating-linear-gradient(45deg, #eef3f0, #eef3f0 6px, #f8faf9 6px, #f8faf9 12px);
+  border-radius: 6px;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.label strong {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.label small {
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.label-price {
+  font-weight: 700;
+  color: var(--brand);
+}
+
+.label-sheet {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+/* --- Receipts ----------------------------------------------------------- */
+
+.receipt {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.receipt-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.receipt-head strong {
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.receipt-lines {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.receipt-lines th,
+.receipt-lines td {
+  text-align: left;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.receipt-lines th:nth-child(n + 2),
+.receipt-lines td:nth-child(n + 2) {
+  text-align: right;
+}
+
+.receipt-lines small {
+  color: var(--ink-soft);
+}
+
+.receipt-totals {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  font-size: 14px;
+}
+
+.receipt-grand {
+  font-weight: 700;
+  font-size: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+
+.receipt-payment {
+  text-transform: capitalize;
+}
+
+.receipt-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-soft);
+}
+
+.receipt-foot {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+/* --- Printing ----------------------------------------------------------- */
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: fixed;
+    inset: 0;
+    overflow: visible;
+    background: #fff;
+    padding: 16px;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .label-sheet {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .label {
+    border: 1px dashed #999;
+    break-inside: avoid;
+  }
+}

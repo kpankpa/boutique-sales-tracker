@@ -1,4 +1,4 @@
-import { database } from '../database';
+import { database, todayClause } from '../database';
 
 export async function insertSale({
   receiptNo,
@@ -86,8 +86,40 @@ export async function listSales({ branchId = null, limit = 100 } = {}) {
   return sales;
 }
 
+export async function findSaleByReceipt(receiptNo, branchId = null) {
+  const clauses = ['s.receipt_no = ?'];
+  const args = [receiptNo];
+  if (branchId) {
+    clauses.push('s.branch_id = ?');
+    args.push(branchId);
+  }
+
+  const result = await database.execute({
+    sql: `SELECT s.id, s.receipt_no, s.branch_id, b.name AS branch_name,
+                 s.user_id, u.name AS cashier_name, s.customer_id, c.name AS customer_name,
+                 s.payment_method, s.subtotal, s.discount, s.total, s.created_at
+          FROM sales s
+          LEFT JOIN branches b ON b.id = s.branch_id
+          LEFT JOIN users u ON u.id = s.user_id
+          LEFT JOIN customers c ON c.id = s.customer_id
+          WHERE ${clauses.join(' AND ')}`,
+    args
+  });
+
+  const sale = result.rows[0];
+  if (!sale) return null;
+
+  const lines = await database.execute({
+    sql: `SELECT sku_snapshot, name_snapshot, size_snapshot, qty, unit_price, line_total
+          FROM sale_lines WHERE sale_id = ?`,
+    args: [sale.id]
+  });
+  sale.lines = lines.rows;
+  return sale;
+}
+
 export async function salesForToday(branchId = null) {
-  const clauses = ["date(s.created_at) = date('now')"];
+  const clauses = [todayClause('s.created_at')];
   const args = [];
   if (branchId) {
     clauses.push('s.branch_id = ?');

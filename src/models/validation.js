@@ -31,6 +31,15 @@ export function normalizeCode(value) {
     .replace(/^-|-$/g, '');
 }
 
+export function normalizeBarcode(value) {
+  if (value === undefined || value === null || String(value).trim() === '') return null;
+  const barcode = String(value).trim().toUpperCase();
+  if (!/^[A-Z0-9][A-Z0-9\-_.]{2,63}$/.test(barcode)) {
+    throw new AppError('Barcode must be 3–64 characters: letters, digits, dashes, dots or underscores.');
+  }
+  return barcode;
+}
+
 export function requireOneOf(value, options, label) {
   if (!options.includes(value)) {
     throw new AppError(`${label} must be one of: ${options.join(', ')}.`);
