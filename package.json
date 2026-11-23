@@ -10,7 +10,8 @@
     "check": "next build",
     "backup": "node scripts/backup.mjs",
     "verify:backup": "node scripts/verify-backup.mjs",
-    "prune:audit": "node scripts/prune-audit.mjs"
+    "prune:audit": "node scripts/prune-audit.mjs",
+    "migrate:neon": "node scripts/migrate-sqlite-to-neon.mjs"
   },
   "engines": {
     "node": ">=20.9.0"

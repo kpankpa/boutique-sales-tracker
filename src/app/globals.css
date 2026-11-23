@@ -580,6 +580,166 @@ a.btn:focus-visible {
   justify-content: flex-end;
 }
 
+/* --- Inline stock editor -------------------------------------------------- */
+.icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.badge .icon {
+  margin-right: 3px;
+}
+
+@keyframes icon-spin {
+  to { transform: rotate(360deg); }
+}
+
+.icon.spin {
+  animation: icon-spin 800ms linear infinite;
+}
+
+.stock-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+}
+
+.stock-filter .input {
+  min-height: 36px;
+  min-width: 150px;
+}
+
+.stock-error {
+  justify-content: flex-start;
+}
+
+.cell-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.cell-with-icon .icon {
+  color: var(--brand);
+}
+
+.code-chip {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--canvas-strong);
+  color: var(--ink-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.qty-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--brand-dark);
+}
+
+.qty-cell .icon {
+  color: var(--brand);
+}
+
+.qty-cell strong {
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+}
+
+.qty-cell.is-low,
+.qty-cell.is-low .icon {
+  color: var(--warning);
+}
+
+.qty-editor {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.qty-editor .input {
+  width: 82px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.qty-step {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background-color var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.qty-step:hover {
+  background: var(--brand-tint);
+  border-color: var(--brand-soft);
+  color: var(--brand-dark);
+}
+
+.stock-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.icon-button {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background-color var(--transition), color var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+
+.icon-button:hover:not(:disabled),
+.icon-button:focus-visible {
+  background: var(--brand-tint);
+  border-color: var(--brand-soft);
+  color: var(--brand-dark);
+}
+
+.icon-button:focus-visible {
+  outline: 2px solid var(--brand-soft);
+  outline-offset: 2px;
+}
+
+.icon-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.icon-button-success {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+.icon-button-success:hover:not(:disabled),
+.icon-button-success:focus-visible {
+  background: var(--brand-dark);
+  border-color: var(--brand-dark);
+  color: #fff;
+}
+
 .empty {
   text-align: center;
   padding: 28px 12px;

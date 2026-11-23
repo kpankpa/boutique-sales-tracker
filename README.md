@@ -85,7 +85,7 @@ If stock moved after the sale was queued, the server returns `400` with `INSUFFI
 - **Retry sale** — resends the same `clientRef`; a successful record leaves the outbox.
 - **Void sale** — removes the unsynced sale from the device.
 
-Admins also have **Admin → Stock** for deliveries, stock counts and write-offs. Every adjustment is written to the audit log.
+Admins also have **Admin → Stock** for deliveries, stock counts and write-offs. Every item/branch row is editable straight from the table: click the pencil in the **On hand** column, type the new quantity (or use the −/+ steppers), then press the check to save or the × to cancel. The app sends the difference as an audited adjustment, so stock can never go negative. A branch filter sits in the card header for busy shops. Every adjustment is written to the audit log.
 
 ## Product sizes
 
@@ -126,6 +126,18 @@ For S3, create a bucket with public object reads (or point `S3_PUBLIC_BASE_URL` 
 
 Keep write credentials server-side; the browser only ever receives the presigned URL.
 
+Neon Storage is supported through the same interface: set `AWS_ENDPOINT_URL_S3` to your Neon Storage endpoint and `S3_BUCKET` to the bucket name (`sales-bin` in this project). The app switches to path-style object URLs (`https://<endpoint>/<bucket>/<key>`) and derives the public URL automatically; virtual-hosted URLs are not used. Neon Storage's CORS already allows `PUT` with `content-type` from any origin.
+
+## Push local data to Neon
+
+After installing and preparing data locally, copy the SQLite database into the Neon PostgreSQL database with:
+
+```bash
+npm run migrate:neon
+```
+
+The script reads `DATABASE_URL` from `.env.production.local` (or the process environment), creates the schema, replaces the hosted tables with the local rows (preserving IDs and repairing sequences), then verifies that all table counts match. It refuses to run when the local database is not installed. This **overwrites** the Neon database, so take a backup first.
+
 ## Environment variables
 
 | Variable | Purpose |
@@ -135,10 +147,11 @@ Keep write credentials server-side; the browser only ever receives the presigned
 | `SESSION_SECRET` | Long random string used to sign session cookies |
 | `LOGIN_MAX_ATTEMPTS` | Failed sign-ins before a 15-minute lockout (default 5) |
 | `AUDIT_RETENTION_DAYS` | Days of audit history to keep (minimum 30, default 365) |
+| `AWS_ENDPOINT_URL_S3` | Optional S3-compatible endpoint (e.g. Neon Storage). Enables path-style `https://<endpoint>/<bucket>/<key>` URLs |
 | `AWS_REGION` | S3 bucket region; needed together with the three variables below to enable direct uploads |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | S3 write credentials, used only on the server to sign uploads |
-| `S3_BUCKET` | Bucket name for product photos |
-| `S3_PUBLIC_BASE_URL` | Optional public base URL (e.g. CloudFront) instead of the default S3 website URL |
+| `S3_BUCKET` | Bucket name for product photos (`sales-bin` on Neon Storage) |
+| `S3_PUBLIC_BASE_URL` | Optional public base URL (e.g. CloudFront) instead of the derived endpoint/bucket URL |
 
 Never commit `.env.local` or `.env.production.local` (both are gitignored). The Neon connection string and `SESSION_SECRET` live only in those files or in Vercel's environment settings.
 
@@ -188,7 +201,7 @@ Stop the app, copy the backup over `data/pos.db`, start the app, sign in and con
 
 1. Create a Neon PostgreSQL project and copy the pooled connection string (`…-pooler.…neon.tech/neondb?sslmode=require`).
 2. Create a Vercel project from this repository.
-3. Add `DATABASE_URL` (the Neon string) and a long random `SESSION_SECRET`. Optionally add `LOGIN_MAX_ATTEMPTS` and `AUDIT_RETENTION_DAYS`. No `DATABASE_AUTH_TOKEN` is needed for Neon.
+3. Add `DATABASE_URL` (the Neon string) and a long random `SESSION_SECRET`. For product photos also add `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `S3_BUCKET=sales-bin` (plus optional `S3_PUBLIC_BASE_URL`). Optionally add `LOGIN_MAX_ATTEMPTS` and `AUDIT_RETENTION_DAYS`. No `DATABASE_AUTH_TOKEN` is needed for Neon.
 4. Deploy and open `/install`.
 5. Smoke test: install → sign in → add product → record sale → view daily summary.
 6. Use Neon's dashboard restore for recovery; schedule `npm run prune:audit` from a machine or CI job that has the same database variables.

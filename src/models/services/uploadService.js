@@ -14,8 +14,14 @@ function configuration() {
   const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
   const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
   if (!region || !bucket || !accessKeyId || !secretAccessKey) return null;
-  const publicBase = (process.env.S3_PUBLIC_BASE_URL || `https://${bucket}.s3.${region}.amazonaws.com`).replace(/\/$/, '');
-  return { region, bucket, accessKeyId, secretAccessKey, publicBase };
+  // S3-compatible providers (e.g. Neon Storage) need a custom endpoint and
+  // path-style object URLs: https://endpoint/bucket/key.
+  const endpoint = process.env.AWS_ENDPOINT_URL_S3?.replace(/\/$/, '') || null;
+  const defaultBase = endpoint
+    ? `${endpoint}/${bucket}`
+    : `https://${bucket}.s3.${region}.amazonaws.com`;
+  const publicBase = (process.env.S3_PUBLIC_BASE_URL || defaultBase).replace(/\/$/, '');
+  return { region, bucket, accessKeyId, secretAccessKey, endpoint, publicBase };
 }
 
 export function uploadMode() {
@@ -44,6 +50,8 @@ export async function presignProductImage(input) {
   ]);
   const client = new S3Client({
     region: config.region,
+    endpoint: config.endpoint || undefined,
+    forcePathStyle: Boolean(config.endpoint),
     credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey }
   });
   const command = new PutObjectCommand({

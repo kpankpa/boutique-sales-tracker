@@ -12,6 +12,7 @@ import { ScannerModal } from './components/ScannerModal';
 import { ReceiptModal } from './components/ReceiptModal';
 import { QrCode } from './components/QrCode';
 import { ImagePicker } from './components/ImagePicker';
+import { Icon } from './components/Icon';
 
 const blankProduct = {
   name: '',
@@ -45,6 +46,8 @@ export default function AdminView() {
   const [editingUserId, setEditingUserId] = useState(null);
   const [branch, setBranch] = useState(blankBranch);
   const [stockAdjustment, setStockAdjustment] = useState(blankStock);
+  const [stockBranchId, setStockBranchId] = useState('');
+  const [stockFormError, setStockFormError] = useState('');
   const [search, setSearch] = useState('');
   const [scanTarget, setScanTarget] = useState(null);
   const [labelProduct, setLabelProduct] = useState(null);
@@ -56,6 +59,8 @@ export default function AdminView() {
 
   useEffect(() => {
     setSearch('');
+    setStockBranchId('');
+    setStockFormError('');
   }, [admin.tab]);
 
   useEffect(() => {
@@ -98,7 +103,12 @@ export default function AdminView() {
   const match = (...values) => !q || values.some((value) => String(value ?? '').toLowerCase().includes(q));
   const filteredProducts = admin.products.filter((row) => match(row.name, row.sku, row.barcode, row.category, row.size, resolveCategoryLabel(row.category)));
   const filteredCategories = categories.filter((row) => match(row.name, row.sizeLabel, ...(row.sizes || [])));
-  const filteredStock = admin.stock.filter((row) => match(row.branch_name, row.sku, row.product_name, row.size));
+  const filteredStock = admin.stock.filter((row) => (
+    (!stockBranchId || String(row.branch_id) === stockBranchId) &&
+    match(row.branch_name, row.sku, row.product_name, row.size)
+  ));
+  // DataTable needs a stable id per row; stock is keyed by branch + product.
+  const stockRows = filteredStock.map((row) => ({ ...row, id: `${row.branch_id}:${row.product_id}` }));
   const filteredCustomers = admin.customers.filter((row) => match(row.name, row.phone, row.email, row.tags));
   const filteredSales = admin.sales.filter((row) => match(row.receipt_no, row.branch_name, row.cashier_name, row.payment_method));
   const filteredUsers = admin.users.filter((row) => match(row.name, row.username, row.role, admin.branches.find((b) => b.id === row.branch_id)?.name));
@@ -164,6 +174,65 @@ export default function AdminView() {
       {extra}
     </div>
   );
+
+  const stockLabel = (row) => `${displayProductName(row.product_name, row.size)} at ${row.branch_name}`;
+
+  const stockActions = (row, helpers) => helpers.editing ? (
+    <div className="stock-actions">
+      <button
+        type="button"
+        className="icon-button icon-button-success"
+        onClick={helpers.saveEdit}
+        disabled={helpers.saving}
+        aria-label={`Save stock for ${stockLabel(row)}`}
+        title="Save new quantity"
+      >
+        <Icon name={helpers.saving ? 'refresh' : 'check'} size={17} className={helpers.saving ? 'spin' : ''} />
+      </button>
+      <button
+        type="button"
+        className="icon-button"
+        onClick={helpers.cancelEdit}
+        disabled={helpers.saving}
+        aria-label="Cancel stock edit"
+        title="Cancel"
+      >
+        <Icon name="close" size={17} />
+      </button>
+    </div>
+  ) : (
+    <div className="stock-actions">
+      <button
+        type="button"
+        className="icon-button"
+        onClick={helpers.startEdit}
+        aria-label={`Edit stock on hand for ${stockLabel(row)}`}
+        title="Edit stock on hand"
+      >
+        <Icon name="pencil" size={17} />
+      </button>
+    </div>
+  );
+
+  const saveStockQty = async (row, draft) => {
+    const next = Number(draft.qty);
+    if (!Number.isFinite(next) || next < 0) {
+      setStockFormError('Enter a quantity of zero or more.');
+      return false;
+    }
+    const current = Number(row.qty ?? 0);
+    if (next === current) {
+      setStockFormError('');
+      return true;
+    }
+    const done = await admin.adjustStock({
+      branchId: row.branch_id,
+      sku: row.sku,
+      delta: next - current
+    });
+    setStockFormError(done ? '' : 'Could not update stock. Please try again.');
+    return done;
+  };
 
   const summaryCards = [
     { label: "Today's sales", value: admin.summary.totalSales },
@@ -504,21 +573,87 @@ export default function AdminView() {
               <Button type="submit">Adjust stock</Button>
             </form>
           </Card>
-          <Card title="Stock on hand" subtitle="Every item with a stock record, by branch.">
+          <Card
+            title="Stock on hand"
+            subtitle="Every item with a stock record, by branch. Edit a quantity straight from the table."
+            actions={(
+              <label className="stock-filter">
+                <Icon name="store" size={16} />
+                <Select
+                  value={stockBranchId}
+                  onChange={(event) => setStockBranchId(event.target.value)}
+                  aria-label="Filter stock by branch"
+                >
+                  <option value="">All branches</option>
+                  {admin.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                </Select>
+              </label>
+            )}
+          >
+            {stockFormError ? (
+              <div className="alert alert-error stock-error" role="alert">
+                <Icon name="alert" size={16} />
+                <span>{stockFormError}</span>
+              </div>
+            ) : null}
             <DataTable
               sortable
               columns={[
-                { key: 'branch', label: 'Branch', render: (row) => row.branch_name },
-                { key: 'sku', label: 'Code', render: (row) => row.sku },
+                { key: 'branch', label: 'Branch', render: (row) => (
+                  <span className="cell-with-icon"><Icon name="store" size={15} />{row.branch_name}</span>
+                ) },
+                { key: 'sku', label: 'Code', render: (row) => <code className="code-chip">{row.sku}</code> },
                 { key: 'name', label: 'Item', render: (row) => displayProductName(row.product_name, row.size) },
-                { key: 'qty', label: 'On hand', render: (row) => row.qty },
+                {
+                  key: 'qty',
+                  label: 'On hand',
+                  editable: true,
+                  editValue: (row) => String(row.qty ?? 0),
+                  editRender: (value, onChange) => (
+                    <div className="qty-editor">
+                      <button
+                        type="button"
+                        className="qty-step"
+                        onClick={() => onChange(String(Math.max(0, Number(value || 0) - 1)))}
+                        aria-label="Decrease quantity"
+                      >
+                        <Icon name="minus" size={14} />
+                      </button>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={value ?? ''}
+                        onChange={(event) => onChange(event.target.value)}
+                        aria-label="Stock on hand"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        className="qty-step"
+                        onClick={() => onChange(String(Number(value || 0) + 1))}
+                        aria-label="Increase quantity"
+                      >
+                        <Icon name="plus" size={14} />
+                      </button>
+                    </div>
+                  ),
+                  render: (row) => (
+                    <span className={`qty-cell${row.qty <= row.low_at ? ' is-low' : ''}`}>
+                      <Icon name="box" size={16} />
+                      <strong>{row.qty}</strong>
+                    </span>
+                  )
+                },
                 { key: 'low', label: 'Reorder at', render: (row) => row.low_at },
                 { key: 'state', label: 'State', render: (row) => row.qty <= row.low_at
-                  ? <Badge tone="warning">Low</Badge>
-                  : <Badge tone="success">OK</Badge> }
+                  ? <Badge tone="warning"><Icon name="alert" size={13} /> Low</Badge>
+                  : <Badge tone="success"><Icon name="check" size={13} /> OK</Badge> },
+                { key: 'action', label: '', render: (row, helpers) => stockActions(row, helpers) }
               ]}
-              rows={filteredStock}
-              empty={q ? 'No stock records match your search.' : 'No stock records yet.'}
+              rows={stockRows}
+              onSaveEdit={saveStockQty}
+              empty={q || stockBranchId ? 'No stock records match your filters.' : 'No stock records yet.'}
             />
           </Card>
         </div>
