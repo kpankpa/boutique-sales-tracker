@@ -1,0 +1,25 @@
+{
+  "name": "slawn-pos",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lightweight multi-branch POS, CRM and sale-capture app for boutiques in Ghana",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "check": "next build",
+    "backup": "node scripts/backup.mjs",
+    "verify:backup": "node scripts/verify-backup.mjs",
+    "prune:audit": "node scripts/prune-audit.mjs"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.15.15",
+    "dexie": "^4.4.7",
+    "next": "^16.4.6",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  }
+}
