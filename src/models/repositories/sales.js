@@ -9,20 +9,21 @@ export async function insertSale({
   subtotal,
   discount,
   total,
-  clientRef
+  clientRef,
+  transactionRef = null
 }, executor = database) {
   const result = await executor.execute({
     sql: `INSERT INTO sales
-          (receipt_no, branch_id, user_id, customer_id, payment_method, subtotal, discount, total, client_ref)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [receiptNo, branchId, userId, customerId, paymentMethod, subtotal, discount, total, clientRef]
+          (receipt_no, branch_id, user_id, customer_id, payment_method, subtotal, discount, total, client_ref, transaction_ref)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [receiptNo, branchId, userId, customerId, paymentMethod, subtotal, discount, total, clientRef, transactionRef]
   });
   return Number(result.lastInsertRowid);
 }
 
 export async function findSaleByClientRef(clientRef, executor = database) {
   const result = await executor.execute({
-    sql: `SELECT id, receipt_no, total FROM sales WHERE client_ref = ?`,
+    sql: `SELECT id, receipt_no, total, transaction_ref FROM sales WHERE client_ref = ?`,
     args: [clientRef]
   });
   return result.rows[0] ?? null;
@@ -62,7 +63,7 @@ export async function listSales({ branchId = null, limit = 100 } = {}) {
   const result = await database.execute({
     sql: `SELECT s.id, s.receipt_no, s.branch_id, b.name AS branch_name,
                  s.user_id, u.name AS cashier_name, s.customer_id, c.name AS customer_name,
-                 s.payment_method, s.subtotal, s.discount, s.total, s.created_at
+                 s.payment_method, s.transaction_ref, s.subtotal, s.discount, s.total, s.created_at
           FROM sales s
           LEFT JOIN branches b ON b.id = s.branch_id
           LEFT JOIN users u ON u.id = s.user_id
@@ -97,7 +98,7 @@ export async function findSaleByReceipt(receiptNo, branchId = null) {
   const result = await database.execute({
     sql: `SELECT s.id, s.receipt_no, s.branch_id, b.name AS branch_name,
                  s.user_id, u.name AS cashier_name, s.customer_id, c.name AS customer_name,
-                 s.payment_method, s.subtotal, s.discount, s.total, s.created_at
+                 s.payment_method, s.transaction_ref, s.subtotal, s.discount, s.total, s.created_at
           FROM sales s
           LEFT JOIN branches b ON b.id = s.branch_id
           LEFT JOIN users u ON u.id = s.user_id

@@ -229,6 +229,7 @@ const schema = [
     status TEXT NOT NULL DEFAULT 'completed',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     client_ref TEXT,
+    transaction_ref TEXT,
     FOREIGN KEY (branch_id) REFERENCES branches(id),
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (customer_id) REFERENCES customers(id)
@@ -297,11 +298,13 @@ export async function createSchema() {
     await database.execute(isPostgres ? toPostgresDdl(statement) : statement);
   }
 
-  // Databases created before client references were added need the column.
-  try {
-    await database.execute('ALTER TABLE sales ADD COLUMN client_ref TEXT');
-  } catch (error) {
-    if (!isDuplicateColumn(error)) throw error;
+  // Older databases need the client reference and payment transaction columns.
+  for (const column of ['client_ref', 'transaction_ref']) {
+    try {
+      await database.execute(`ALTER TABLE sales ADD COLUMN ${column} TEXT`);
+    } catch (error) {
+      if (!isDuplicateColumn(error)) throw error;
+    }
   }
 
   await database.execute(

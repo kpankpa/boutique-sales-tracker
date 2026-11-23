@@ -112,6 +112,8 @@ Every product can carry a manufacturer barcode (EAN/UPC/Code128, or any code of 
 
 **Scan-to-fill ( Admin → Products ):** the **Scan** button next to Barcode accepts both camera and keyboard-wedge scanners. It first tries to match the code against the catalogue: if the item exists, the form switches to **Edit product** with every field prefilled, so you can restock or correct details immediately. If the scan is one of our smart QR labels for an item not yet in the system, the form is filled as a new product and you only need to review and save. Plain barcodes with no match simply fill the barcode field, as before. The **Fill** button does the same lookup for a code you typed.
 
+**Payment transaction IDs:** choosing **Mobile money** or **Card** reveals a **Transaction ID** field. Enter the reference from the MoMo confirmation message or the card terminal approval code — the sale cannot be completed without it, including when queued offline. The reference is saved on the sale, shown on the printed receipt, and appears in Admin → Sales, where you can also search by it. Cash and credit sales do not store a transaction ID.
+
 **Receipts:** completing a sale opens a printable receipt with a QR code of the receipt number. Tap any receipt number in POS or Admin → Sales (or **Scan receipt** with the camera) to reopen it. Receipt lookup is branch-scoped for cashiers. Printing uses the browser print dialog; only the receipt/label area prints.
 
 ## Product photos

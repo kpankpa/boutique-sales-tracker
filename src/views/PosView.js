@@ -393,6 +393,23 @@ export default function PosView() {
                 <Input type="number" min="0" value={pos.discount} onChange={(event) => pos.setDiscount(event.target.value)} placeholder="0.00" />
               </Field>
             </div>
+            {(pos.paymentMethod === 'momo' || pos.paymentMethod === 'card') && (
+              <Field
+                label={pos.paymentMethod === 'momo' ? 'MoMo transaction ID' : 'Card transaction ID'}
+                hint={pos.paymentMethod === 'momo'
+                  ? 'Copy the reference from the payment confirmation message.'
+                  : 'Enter the approval or reference code from the card terminal.'}
+              >
+                <Input
+                  value={pos.transactionRef}
+                  onChange={(event) => pos.setTransactionRef(event.target.value)}
+                  placeholder={pos.paymentMethod === 'momo' ? 'e.g. PS123456789' : 'e.g. 001234'}
+                  maxLength={100}
+                  autoComplete="off"
+                  required
+                />
+              </Field>
+            )}
             <Field label="Customer">
               <div className="row">
                 <Select value={pos.customerId} onChange={(event) => pos.setCustomerId(event.target.value)}>

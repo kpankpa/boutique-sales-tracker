@@ -9,6 +9,7 @@ import { displayProductName } from '../productOptions';
 import { nonNegativeNumber, positiveNumber, requireOneOf, required } from '../validation';
 
 const paymentMethods = ['cash', 'momo', 'card', 'credit'];
+const referencePaymentMethods = new Set(['momo', 'card']);
 
 function makeReceiptNumber() {
   const stamp = Date.now().toString(36).toUpperCase();
@@ -22,6 +23,16 @@ function clientReference(input) {
   }
   const reference = String(input.clientRef).trim();
   if (reference.length > 100) throw new AppError('Sale reference is too long.');
+  return reference;
+}
+
+// MoMo and card payments must carry the reference from the payment provider so
+// the sale can be reconciled later. Cash and credit sales never store one.
+function transactionReference(input, paymentMethod) {
+  if (!referencePaymentMethods.has(paymentMethod)) return null;
+  const label = paymentMethod === 'momo' ? 'MoMo transaction ID' : 'Card transaction ID';
+  const reference = required(input.transactionRef, label);
+  if (reference.length > 100) throw new AppError(`${label} is too long.`);
   return reference;
 }
 
@@ -59,11 +70,13 @@ export async function recordSale(user, input) {
       saleId: existing.id,
       receiptNo: existing.receipt_no,
       total: existing.total,
+      transactionRef: existing.transaction_ref ?? null,
       replayed: true
     };
   }
 
   const paymentMethod = requireOneOf(input.paymentMethod, paymentMethods, 'Payment method');
+  const transactionRef = transactionReference(input, paymentMethod);
   const items = Array.isArray(input.items) ? input.items : [];
   if (items.length === 0) {
     throw new AppError('Add at least one item to the sale.');
@@ -118,7 +131,8 @@ export async function recordSale(user, input) {
         subtotal,
         discount,
         total,
-        clientRef
+        clientRef,
+        transactionRef
       }, tx);
 
       await insertSaleLines(saleId, lines, tx);
@@ -134,13 +148,14 @@ export async function recordSale(user, input) {
         branchId,
         cashier: user.name,
         paymentMethod,
+        transactionRef,
         total,
         lines: lines.map((line) => ({ sku: line.sku, size: line.size, qty: line.qty }))
       }, tx);
 
-      await addAudit(user.id, 'sale_created', 'sale', saleId, { receiptNo, total }, tx);
+      await addAudit(user.id, 'sale_created', 'sale', saleId, { receiptNo, total, transactionRef }, tx);
 
-      return { saleId, receiptNo, total };
+      return { saleId, receiptNo, total, transactionRef };
     });
   } catch (error) {
     if (!isDuplicateReference(error)) throw error;
@@ -150,6 +165,7 @@ export async function recordSale(user, input) {
       saleId: replayed.id,
       receiptNo: replayed.receipt_no,
       total: replayed.total,
+      transactionRef: replayed.transaction_ref ?? null,
       replayed: true
     };
   }

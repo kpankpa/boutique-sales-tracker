@@ -14,6 +14,7 @@ export function ReceiptModal({ receipt, companyName = 'Slawn POS', onClose }) {
   const discount = Number(receipt.discount ?? 0);
   const total = Number(receipt.total ?? subtotal - discount);
   const payment = receipt.payment_method ?? receipt.paymentMethod ?? '';
+  const transactionRef = receipt.transaction_ref ?? receipt.transactionRef ?? '';
   const branch = receipt.branch_name ?? receipt.branchName ?? '';
   const cashier = receipt.cashier_name ?? receipt.cashierName ?? '';
   const customer = receipt.customer_name ?? receipt.customerName ?? '';
@@ -65,6 +66,7 @@ export function ReceiptModal({ receipt, companyName = 'Slawn POS', onClose }) {
           <span className="receipt-grand">Total</span>
           <span className="receipt-grand">{money(total)}</span>
           {payment && (<><span>Payment</span><span className="receipt-payment">{payment}</span></>)}
+          {transactionRef && (<><span>Transaction ID</span><span className="receipt-ref">{transactionRef}</span></>)}
         </div>
 
         <div className="receipt-qr">

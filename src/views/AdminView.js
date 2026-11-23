@@ -188,7 +188,7 @@ export default function AdminView() {
   // DataTable needs a stable id per row; stock is keyed by branch + product.
   const stockRows = filteredStock.map((row) => ({ ...row, id: `${row.branch_id}:${row.product_id}` }));
   const filteredCustomers = admin.customers.filter((row) => match(row.name, row.phone, row.email, row.tags));
-  const filteredSales = admin.sales.filter((row) => match(row.receipt_no, row.branch_name, row.cashier_name, row.payment_method));
+  const filteredSales = admin.sales.filter((row) => match(row.receipt_no, row.branch_name, row.cashier_name, row.payment_method, row.transaction_ref));
   const filteredUsers = admin.users.filter((row) => match(row.name, row.username, row.role, admin.branches.find((b) => b.id === row.branch_id)?.name));
   const filteredBranches = admin.branches.filter((row) => match(row.name, row.code));
   const filteredOutbox = admin.outbox.filter((row) => match(row.event_type, row.status, row.payload));
@@ -894,7 +894,7 @@ export default function AdminView() {
       {admin.tab === 'Sales' && (
         <Card
           title="All sales"
-          subtitle="Tap a receipt number to view or print it, or scan the QR code on a printed receipt."
+          subtitle="Tap a receipt number to view or print it. Search by receipt, cashier or MoMo/card transaction ID."
           actions={<Button variant="secondary" onClick={() => setShowReceiptScanner(true)}>Scan receipt</Button>}
         >
           <DataTable
@@ -909,6 +909,7 @@ export default function AdminView() {
               { key: 'branch', label: 'Branch', render: (row) => row.branch_name },
               { key: 'cashier', label: 'Cashier', render: (row) => row.cashier_name },
               { key: 'payment', label: 'Payment', render: (row) => row.payment_method },
+              { key: 'transaction', label: 'Transaction ID', render: (row) => row.transaction_ref || <span className="muted">—</span> },
               { key: 'total', label: 'Total', render: (row) => money(row.total) }
             ]}
             rows={filteredSales}

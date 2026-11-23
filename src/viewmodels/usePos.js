@@ -28,6 +28,7 @@ export function usePos() {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [customerId, setCustomerId] = useState('');
   const [discount, setDiscount] = useState('');
+  const [transactionRef, setTransactionRef] = useState('');
   const [receipt, setReceipt] = useState(null);
   const [queue, setQueue] = useState([]);
   const [offline, setOffline] = useState(false);
@@ -241,13 +242,23 @@ export function usePos() {
       return null;
     }
 
+    const needsReference = paymentMethod === 'momo' || paymentMethod === 'card';
+    const reference = transactionRef.trim();
+    if (needsReference && !reference) {
+      setError(paymentMethod === 'momo'
+        ? 'Enter the MoMo transaction ID before completing the sale.'
+        : 'Enter the card transaction ID before completing the sale.');
+      return null;
+    }
+
     const payload = {
       items: cart.map((line) => ({ sku: line.sku, qty: line.qty })),
       paymentMethod,
       customerId: customerId ? Number(customerId) : null,
       discount: Number(discount) || 0,
       branchId: branches[0]?.id ?? null,
-      clientRef: newReference()
+      clientRef: newReference(),
+      transactionRef: needsReference ? reference : null
     };
 
     setBusy(true);
@@ -258,6 +269,7 @@ export function usePos() {
       setReceipt({ queued: true });
       setCart([]);
       setDiscount('');
+      setTransactionRef('');
       setBusy(false);
       return { queued: true };
     }
@@ -277,6 +289,7 @@ export function usePos() {
         subtotal: Number(cartTotal.toFixed(2)),
         discount: Number(discount) || 0,
         payment_method: paymentMethod,
+        transaction_ref: result.transactionRef ?? null,
         branch_name: branches[0]?.name ?? '',
         customer_name: customers.find((entry) => String(entry.id) === String(customerId))?.name ?? '',
         created_at: new Date().toISOString()
@@ -284,6 +297,7 @@ export function usePos() {
       setReceipt(fullReceipt);
       setCart([]);
       setDiscount('');
+      setTransactionRef('');
       await load();
       return fullReceipt;
     } catch (failure) {
@@ -292,6 +306,7 @@ export function usePos() {
         setReceipt({ queued: true });
         setCart([]);
         setDiscount('');
+      setTransactionRef('');
         return { queued: true };
       }
       setError(failure.message);
@@ -339,6 +354,7 @@ export function usePos() {
     paymentMethod,
     customerId,
     discount,
+    transactionRef,
     receipt,
     queue,
     conflicts,
@@ -348,6 +364,7 @@ export function usePos() {
     setPaymentMethod,
     setCustomerId,
     setDiscount,
+    setTransactionRef,
     setError,
     addProduct,
     addByCode,
