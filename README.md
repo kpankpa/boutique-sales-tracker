@@ -112,6 +112,20 @@ Every product can carry a manufacturer barcode (EAN/UPC/Code128, or any code of 
 
 **Receipts:** completing a sale opens a printable receipt with a QR code of the receipt number. Tap any receipt number in POS or Admin → Sales (or **Scan receipt** with the camera) to reopen it. Receipt lookup is branch-scoped for cashiers. Printing uses the browser print dialog; only the receipt/label area prints.
 
+## Product photos
+
+Admin → Products has a **Choose photo** picker in the add form and in each row's **Edit** mode. Images are resized to at most 900px and compressed to JPEG in the browser before being saved, so photos stay small even when uploaded from a phone. POS product cards and the Admin table show thumbnails; removing a photo is a click away.
+
+When S3 is configured, the server issues a short-lived presigned PUT URL and the browser uploads straight to the bucket; the stored value is a public HTTPS URL. Without S3 (the default for local development), the compressed image is stored inline as a data URL on the product — no external service required. Both stores are accepted by the API, so switching to S3 later does not break existing products.
+
+For S3, create a bucket with public object reads (or point `S3_PUBLIC_BASE_URL` at your CDN) and add a CORS rule allowing `PUT` from your app's origin, e.g.:
+
+```json
+[{ "AllowedOrigins": ["https://your-app.vercel.app", "http://localhost:3000"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["content-type"] }]
+```
+
+Keep write credentials server-side; the browser only ever receives the presigned URL.
+
 ## Environment variables
 
 | Variable | Purpose |
@@ -121,6 +135,10 @@ Every product can carry a manufacturer barcode (EAN/UPC/Code128, or any code of 
 | `SESSION_SECRET` | Long random string used to sign session cookies |
 | `LOGIN_MAX_ATTEMPTS` | Failed sign-ins before a 15-minute lockout (default 5) |
 | `AUDIT_RETENTION_DAYS` | Days of audit history to keep (minimum 30, default 365) |
+| `AWS_REGION` | S3 bucket region; needed together with the three variables below to enable direct uploads |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | S3 write credentials, used only on the server to sign uploads |
+| `S3_BUCKET` | Bucket name for product photos |
+| `S3_PUBLIC_BASE_URL` | Optional public base URL (e.g. CloudFront) instead of the default S3 website URL |
 
 Never commit `.env.local` or `.env.production.local` (both are gitignored). The Neon connection string and `SESSION_SECRET` live only in those files or in Vercel's environment settings.
 

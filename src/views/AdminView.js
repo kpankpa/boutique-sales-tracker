@@ -11,6 +11,7 @@ import { Badge, Button, Card, DataTable, Field, Input, Modal, Select, Shell } fr
 import { ScannerModal } from './components/ScannerModal';
 import { ReceiptModal } from './components/ReceiptModal';
 import { QrCode } from './components/QrCode';
+import { ImagePicker } from './components/ImagePicker';
 
 const blankProduct = {
   name: '',
@@ -19,6 +20,7 @@ const blankProduct = {
   size: '',
   sizes: [],
   barcode: '',
+  imageUrl: '',
   price: '',
   cost: '',
   openingStock: '',
@@ -50,6 +52,7 @@ export default function AdminView() {
   const [showReceiptScanner, setShowReceiptScanner] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [imageError, setImageError] = useState('');
 
   useEffect(() => {
     setSearch('');
@@ -251,7 +254,8 @@ export default function AdminView() {
                 category: product.category,
                 price: product.price,
                 cost: product.cost,
-                openingStock: product.openingStock
+                openingStock: product.openingStock,
+                imageUrl: product.imageUrl
               };
               if (product.sizes.length > 0) {
                 payload.baseSku = product.sku;
@@ -264,6 +268,7 @@ export default function AdminView() {
               create(admin.createProduct, payload, () => {
                 setProduct(blankProduct);
                 setCustomSize('');
+                setImageError('');
               });
             }}>
               <Field label="Category">
@@ -303,6 +308,14 @@ export default function AdminView() {
                   </Button>
                 </div>
               </Field>
+              <Field label="Product photo" hint="Optional. Storage is inline unless an S3 bucket is configured.">
+                <ImagePicker
+                  value={product.imageUrl}
+                  onChange={(imageUrl) => setProduct((current) => ({ ...current, imageUrl }))}
+                  onError={setImageError}
+                />
+              </Field>
+              {imageError && <div className="alert alert-error" role="alert">{imageError}</div>}
               <Field label="Price (GH₵)"><Input type="number" min="0" step="0.01" value={product.price} onChange={(event) => setProduct({ ...product, price: event.target.value })} required /></Field>
               <Field label="Cost (GH₵)"><Input type="number" min="0" step="0.01" value={product.cost} onChange={(event) => setProduct({ ...product, cost: event.target.value })} /></Field>
               <Field label="Opening stock" hint="Added to every branch, per size"><Input type="number" min="0" step="1" value={product.openingStock} onChange={(event) => setProduct({ ...product, openingStock: event.target.value })} /></Field>
@@ -404,12 +417,21 @@ export default function AdminView() {
                 category: draft.category,
                 size: draft.size,
                 barcode: draft.barcode,
+                imageUrl: draft.image_url,
                 price: draft.price,
                 cost: draft.cost,
                 active: row.active
               })}
               columns={[
                 { key: 'sku', label: 'Code', render: (row) => row.sku },
+                { key: 'image_url', label: 'Photo', editable: true,
+                  editValue: (row) => row.image_url || '',
+                  editRender: (value, onChange) => (
+                    <ImagePicker compact value={value || ''} onChange={onChange} onError={setImageError} />
+                  ),
+                  render: (row) => row.image_url
+                    ? <img className="table-thumb" src={row.image_url} alt="" loading="lazy" />
+                    : <span className="muted">—</span> },
                 { key: 'name', label: 'Name', editable: true, render: (row) => row.name },
                 { key: 'size', label: 'Size', editable: true, editValue: (row) => row.size || '', render: (row) => row.size || '—' },
                 { key: 'barcode', label: 'Barcode', editable: true,

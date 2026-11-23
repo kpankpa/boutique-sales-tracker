@@ -189,6 +189,7 @@ const schema = [
     category TEXT NOT NULL DEFAULT 'other',
     size TEXT,
     barcode TEXT,
+    image_url TEXT,
     price REAL NOT NULL,
     cost REAL NOT NULL DEFAULT 0,
     active INTEGER NOT NULL DEFAULT 1,
@@ -311,6 +312,7 @@ export async function createSchema() {
     "ALTER TABLE products ADD COLUMN category TEXT NOT NULL DEFAULT 'other'",
     'ALTER TABLE products ADD COLUMN size TEXT',
     'ALTER TABLE products ADD COLUMN barcode TEXT',
+    'ALTER TABLE products ADD COLUMN image_url TEXT',
     'ALTER TABLE sale_lines ADD COLUMN size_snapshot TEXT'
   ]) {
     try {

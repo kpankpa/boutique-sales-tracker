@@ -1,6 +1,6 @@
 import { database } from '../database';
 
-const columns = 'id, sku, name, category, size, barcode, price, cost, active';
+const columns = 'id, sku, name, category, size, barcode, image_url, price, cost, active';
 
 export async function listProducts() {
   const result = await database.execute(
@@ -13,7 +13,7 @@ export async function listProducts() {
 
 export async function findProductBySku(sku) {
   const result = await database.execute({
-    sql: `SELECT id, sku, name, category, size, barcode, price, cost
+    sql: `SELECT id, sku, name, category, size, barcode, image_url, price, cost
           FROM products
           WHERE sku = ? AND active = 1`,
     args: [sku]
@@ -23,7 +23,7 @@ export async function findProductBySku(sku) {
 
 export async function findProductByBarcode(barcode) {
   const result = await database.execute({
-    sql: `SELECT id, sku, name, category, size, barcode, price, cost
+    sql: `SELECT id, sku, name, category, size, barcode, image_url, price, cost
           FROM products
           WHERE barcode = ? AND active = 1`,
     args: [barcode]
@@ -39,20 +39,20 @@ export async function findProductById(id) {
   return result.rows[0] ?? null;
 }
 
-export async function insertProduct({ sku, name, category = 'other', size = null, barcode = null, price, cost }) {
+export async function insertProduct({ sku, name, category = 'other', size = null, barcode = null, imageUrl = null, price, cost }) {
   const result = await database.execute({
-    sql: `INSERT INTO products (sku, name, category, size, barcode, price, cost)
-          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    args: [sku, name, category, size, barcode, price, cost]
+    sql: `INSERT INTO products (sku, name, category, size, barcode, image_url, price, cost)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [sku, name, category, size, barcode, imageUrl, price, cost]
   });
   return Number(result.lastInsertRowid);
 }
 
-export async function updateProduct({ id, name, category, size, barcode, price, cost, active }) {
+export async function updateProduct({ id, name, category, size, barcode, imageUrl, price, cost, active }) {
   await database.execute({
     sql: `UPDATE products
-          SET name = ?, category = ?, size = ?, barcode = ?, price = ?, cost = ?, active = ?
+          SET name = ?, category = ?, size = ?, barcode = ?, image_url = ?, price = ?, cost = ?, active = ?
           WHERE id = ?`,
-    args: [name, category, size, barcode, price, cost, active ? 1 : 0, id]
+    args: [name, category, size, barcode, imageUrl, price, cost, active ? 1 : 0, id]
   });
 }

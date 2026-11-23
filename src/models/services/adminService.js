@@ -13,6 +13,7 @@ import {
   nonNegativeNumber,
   normalizeBarcode,
   normalizeCode,
+  normalizeImageUrl,
   positiveNumber,
   requireOneOf,
   required
@@ -97,14 +98,14 @@ async function assertBarcodeFree(barcode, excludeId = null) {
   }
 }
 
-async function createVariant({ sku, name, category, size, barcode = null, price, cost, openingStock, branches }) {
+async function createVariant({ sku, name, category, size, barcode = null, imageUrl = null, price, cost, openingStock, branches }) {
   if (await findProductBySku(sku)) {
     throw new AppError(`That item code already exists: ${sku}.`);
   }
   await assertBarcodeFree(barcode);
   let productId;
   try {
-    productId = await insertProduct({ sku, name, category, size, barcode, price, cost });
+    productId = await insertProduct({ sku, name, category, size, barcode, imageUrl, price, cost });
   } catch (error) {
     if (isDuplicateBarcode(error)) {
       throw new AppError('That barcode is already used by another item.', 'BARCODE_EXISTS');
@@ -126,6 +127,7 @@ export async function createProduct(input) {
   const cost = nonNegativeNumber(input.cost, 'Cost');
   const openingStock = nonNegativeNumber(input.openingStock, 'Opening stock');
   const sizes = normalizeSizes(input);
+  const imageUrl = normalizeImageUrl(input.imageUrl ?? input.image_url);
   const branches = openingStock > 0 ? await listBranches() : [];
   const multiSize = Array.isArray(input.sizes);
 
@@ -138,7 +140,7 @@ export async function createProduct(input) {
       const sku = variants.length === 1 && !size
         ? baseSku
         : normalizeCode(`${baseSku}-${token}`);
-      ids.push(await createVariant({ sku, name, category, size, price, cost, openingStock, branches }));
+      ids.push(await createVariant({ sku, name, category, size, imageUrl, price, cost, openingStock, branches }));
     }
     return { ids, count: ids.length };
   }
@@ -146,7 +148,7 @@ export async function createProduct(input) {
   const sku = normalizeCode(input.sku);
   const size = normalizeSize(input.size);
   const barcode = normalizeBarcode(input.barcode);
-  const id = await createVariant({ sku, name, category, size, barcode, price, cost, openingStock, branches });
+  const id = await createVariant({ sku, name, category, size, barcode, imageUrl, price, cost, openingStock, branches });
   return { id, ids: [id], count: 1 };
 }
 
@@ -165,9 +167,13 @@ export async function editProduct(input) {
   const barcode = input.barcode === undefined
     ? existing.barcode ?? null
     : normalizeBarcode(input.barcode);
+  // Quick actions omit the image entirely; an explicit '' clears it.
+  const imageUrl = input.imageUrl === undefined && input.image_url === undefined
+    ? existing.image_url ?? null
+    : normalizeImageUrl(input.imageUrl ?? input.image_url);
   await assertBarcodeFree(barcode, id);
   try {
-    await updateProduct({ id, name, category, size, barcode, price, cost, active });
+    await updateProduct({ id, name, category, size, barcode, imageUrl, price, cost, active });
   } catch (error) {
     if (isDuplicateBarcode(error)) {
       throw new AppError('That barcode is already used by another item.', 'BARCODE_EXISTS');

@@ -29,6 +29,7 @@ import {
 } from '../../../models/services/adminService';
 import { recordSale } from '../../../models/services/saleService';
 import { lookupCode } from '../../../models/services/lookupService';
+import { presignProductImage } from '../../../models/services/uploadService';
 import { adjustStockFromInput } from '../../../models/services/stockService';
 import { dailySummary, lowStock } from '../../../models/services/reportService';
 
@@ -153,6 +154,12 @@ async function handle(request, context) {
     if (key === 'lookup' && method === 'GET') {
       const code = request.nextUrl.searchParams.get('code') || '';
       return ok(await lookupCode(code));
+    }
+    if (key === 'uploads/presign' && method === 'POST') {
+      const denied = requireAdmin(user);
+      if (denied) return denied;
+      const body = await request.json().catch(() => ({}));
+      return ok(await presignProductImage(body));
     }
     if (key === 'products' && method === 'POST') {
       const denied = requireAdmin(user);

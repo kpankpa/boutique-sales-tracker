@@ -346,6 +346,9 @@ export default function PosView() {
                     }
                   }}
                 >
+                  {group.variants[0]?.image_url && (
+                    <img className="product-image" src={group.variants[0].image_url} alt="" loading="lazy" />
+                  )}
                   <button
                     type="button"
                     className="product-pin"
