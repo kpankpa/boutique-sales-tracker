@@ -57,9 +57,42 @@ export function Badge({ tone = 'neutral', children }) {
   return <span className={`badge badge-${tone}`}>{children}</span>;
 }
 
-export function DataTable({ columns, rows, empty = 'Nothing to show yet.', sortable = false }) {
+export function DataTable({ columns, rows, empty = 'Nothing to show yet.', sortable = false, onSaveEdit }) {
   const [sortKey, setSortKey] = useState(null);
   const [sortDir, setSortDir] = useState('asc');
+  const [editingId, setEditingId] = useState(null);
+  const [draft, setDraft] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  const startEdit = (row) => {
+    if (!onSaveEdit) return;
+    const initial = {};
+    for (const column of columns) {
+      if (column.editable) {
+        initial[column.key] = column.editValue ? column.editValue(row) : (row[column.key] ?? '');
+      }
+    }
+    setEditingId(row.id);
+    setDraft(initial);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setDraft({});
+  };
+
+  const saveEdit = async (row) => {
+    if (!onSaveEdit || saving) return;
+    setSaving(true);
+    try {
+      const done = await onSaveEdit(row, draft);
+      if (done !== false) cancelEdit();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const setDraftValue = (key, value) => setDraft((current) => ({ ...current, [key]: value }));
 
   const sortedRows = useMemo(() => {
     if (!sortable || !sortKey) return rows;
@@ -79,6 +112,8 @@ export function DataTable({ columns, rows, empty = 'Nothing to show yet.', sorta
   }, [rows, columns, sortKey, sortDir, sortable]);
 
   if (!rows.length) return <EmptyState message={empty} />;
+
+  const firstEditableKey = columns.find((column) => column.editable)?.key;
 
   const toggleSort = (key) => {
     if (!sortable) return;
@@ -110,13 +145,55 @@ export function DataTable({ columns, rows, empty = 'Nothing to show yet.', sorta
           </tr>
         </thead>
         <tbody>
-          {sortedRows.map((row, index) => (
-            <tr key={row.id ?? index}>
-              {columns.map((column) => (
-                <td key={column.key} data-label={column.label || ''}>{column.render ? column.render(row) : row[column.key]}</td>
-              ))}
-            </tr>
-          ))}
+          {sortedRows.map((row, index) => {
+            const isEditing = Boolean(onSaveEdit) && editingId != null && editingId === row.id;
+            const helpers = {
+              editing: isEditing,
+              saving,
+              draft,
+              setDraftValue,
+              startEdit: () => startEdit(row),
+              saveEdit: () => saveEdit(row),
+              cancelEdit
+            };
+            return (
+              <tr key={row.id ?? index} className={isEditing ? 'editing' : ''}>
+                {columns.map((column) => {
+                  let content;
+                  if (isEditing && column.editable) {
+                    const value = draft[column.key];
+                    content = column.editRender
+                      ? column.editRender(value, (next) => setDraftValue(column.key, next), draft, row)
+                      : (
+                        <Input
+                          type={column.editType || 'text'}
+                          value={value ?? ''}
+                          min={column.editType === 'number' ? '0' : undefined}
+                          step={column.editType === 'number' ? 'any' : undefined}
+                          onChange={(event) => setDraftValue(column.key, event.target.value)}
+                          aria-label={`Edit ${column.label || column.key}`}
+                          autoFocus={column.key === firstEditableKey}
+                        />
+                      );
+                  } else {
+                    content = column.render ? column.render(row, helpers) : row[column.key];
+                  }
+                  return (
+                    <td
+                      key={column.key}
+                      data-label={column.label || ''}
+                      onKeyDown={isEditing && column.editable ? (event) => {
+                        if (event.key === 'Enter') { event.preventDefault(); saveEdit(row); }
+                        if (event.key === 'Escape') { event.preventDefault(); cancelEdit(); }
+                      } : undefined}
+                    >
+                      {content}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

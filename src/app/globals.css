@@ -489,6 +489,11 @@ a.btn:focus-visible {
   color: var(--warning);
 }
 
+.badge-danger {
+  background: #fef3f2;
+  color: var(--danger);
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -558,6 +563,21 @@ a.btn:focus-visible {
 
 .table tbody tr:hover {
   background: #fafcfb;
+}
+
+.table tbody tr.editing,
+.table tbody tr.editing:hover {
+  background: var(--brand-tint);
+}
+
+.table td .input {
+  min-height: 36px;
+  padding: 6px 9px;
+  font-size: 14px;
+}
+
+.table tr.editing td .check {
+  justify-content: flex-end;
 }
 
 .empty {
@@ -655,6 +675,7 @@ a.btn:focus-visible {
 }
 
 .product {
+  position: relative;
   border: 1px solid var(--line);
   background: #fff;
   border-radius: 12px;
@@ -666,6 +687,38 @@ a.btn:focus-visible {
   cursor: pointer;
   min-height: 104px;
   transition: border-color var(--transition), transform var(--transition), box-shadow var(--transition);
+}
+
+.product.is-favorite {
+  border-color: #e3cf9c;
+  background: #fffdf6;
+}
+
+.product-pin {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  border: 0;
+  background: transparent;
+  padding: 4px;
+  font-size: 16px;
+  line-height: 1;
+  color: #c3cec9;
+  cursor: pointer;
+  transition: color var(--transition), transform var(--transition);
+}
+
+.product-pin:hover {
+  color: var(--gold);
+  transform: scale(1.15);
+}
+
+.product.is-favorite .product-pin {
+  color: var(--gold);
+}
+
+.product-stock {
+  margin-top: 2px;
 }
 
 .product:hover {
@@ -703,8 +756,13 @@ a.btn:focus-visible {
   cursor: pointer;
 }
 
-.size-chip:hover {
+.size-chip:hover:not(:disabled) {
   border-color: var(--brand-soft);
+}
+
+.size-chip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .size-chip.active {
@@ -880,6 +938,10 @@ a.btn:focus-visible {
   }
   .table td[data-label=""]::before {
     display: none;
+  }
+  .table td .input {
+    flex: 1;
+    min-width: 0;
   }
 }
 

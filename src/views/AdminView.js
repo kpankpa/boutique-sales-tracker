@@ -31,15 +31,12 @@ export default function AdminView() {
   const admin = useAdmin();
   const [product, setProduct] = useState(blankProduct);
   const [customSize, setCustomSize] = useState('');
-  const [editingProductId, setEditingProductId] = useState(null);
   const [category, setCategory] = useState(blankCategory);
-  const [editingCategoryId, setEditingCategoryId] = useState(null);
   const [customer, setCustomer] = useState(blankCustomer);
   const [editingCustomerId, setEditingCustomerId] = useState(null);
   const [staff, setStaff] = useState(blankUser);
   const [editingUserId, setEditingUserId] = useState(null);
   const [branch, setBranch] = useState(blankBranch);
-  const [editingBranchId, setEditingBranchId] = useState(null);
   const [stockAdjustment, setStockAdjustment] = useState(blankStock);
   const [search, setSearch] = useState('');
 
@@ -132,6 +129,18 @@ export default function AdminView() {
     if (confirmed) await admin.deactivateCustomer({ id: row.id });
   };
 
+  const inlineActions = (row, helpers, extra = null) => helpers.editing ? (
+    <div className="row">
+      <Button onClick={helpers.saveEdit} disabled={helpers.saving}>{helpers.saving ? 'Saving…' : 'Save'}</Button>
+      <Button variant="ghost" onClick={helpers.cancelEdit} disabled={helpers.saving}>Cancel</Button>
+    </div>
+  ) : (
+    <div className="row">
+      <Button variant="ghost" onClick={helpers.startEdit}>Edit</Button>
+      {extra}
+    </div>
+  );
+
   const summaryCards = [
     { label: "Today's sales", value: admin.summary.totalSales },
     { label: "Today's total", value: money(admin.summary.totalAmount) },
@@ -213,26 +222,9 @@ export default function AdminView() {
 
       {admin.tab === 'Products' && (
         <div className="stack">
-          <Card title={editingProductId ? 'Edit product' : 'Add product'} subtitle={editingProductId ? 'Update this variant. SKU stays the same to protect sales history.' : 'Use sizes for shoes, clothes and trousers. Each size gets its own stock record.'}>
+          <Card title="Add product" subtitle="Use sizes for shoes, clothes and trousers. Each size gets its own stock record. Edit existing items right in the table below.">
             <form className="form-grid" onSubmit={async (event) => {
               event.preventDefault();
-              if (editingProductId) {
-                const done = await admin.updateProduct({
-                  id: editingProductId,
-                  name: product.name,
-                  category: product.category,
-                  size: product.size,
-                  price: product.price,
-                  cost: product.cost,
-                  active: product.active !== false
-                });
-                if (done) {
-                  setEditingProductId(null);
-                  setProduct(blankProduct);
-                  setCustomSize('');
-                }
-                return;
-              }
               const payload = {
                 name: product.name,
                 category: product.category,
@@ -260,24 +252,14 @@ export default function AdminView() {
                 </Select>
               </Field>
               <Field label="Product name"><Input value={product.name} onChange={(event) => setProduct({ ...product, name: event.target.value })} required /></Field>
-              <Field label={editingProductId ? 'Item code' : (product.sizes.length > 0 ? 'Style code' : 'Item code')} hint={editingProductId ? 'SKU cannot be changed.' : (product.sizes.length > 0 ? 'Each size becomes CODE-SIZE' : 'Unique code used at the till')}>
-                <Input value={product.sku} onChange={(event) => setProduct({ ...product, sku: event.target.value })} required disabled={Boolean(editingProductId)} />
+              <Field label={product.sizes.length > 0 ? 'Style code' : 'Item code'} hint={product.sizes.length > 0 ? 'Each size becomes CODE-SIZE' : 'Unique code used at the till'}>
+                <Input value={product.sku} onChange={(event) => setProduct({ ...product, sku: event.target.value })} required />
               </Field>
               <Field label="Price (GH₵)"><Input type="number" min="0" step="0.01" value={product.price} onChange={(event) => setProduct({ ...product, price: event.target.value })} required /></Field>
               <Field label="Cost (GH₵)"><Input type="number" min="0" step="0.01" value={product.cost} onChange={(event) => setProduct({ ...product, cost: event.target.value })} /></Field>
-              {!editingProductId && (
-                <Field label="Opening stock" hint="Added to every branch, per size"><Input type="number" min="0" step="1" value={product.openingStock} onChange={(event) => setProduct({ ...product, openingStock: event.target.value })} /></Field>
-              )}
+              <Field label="Opening stock" hint="Added to every branch, per size"><Input type="number" min="0" step="1" value={product.openingStock} onChange={(event) => setProduct({ ...product, openingStock: event.target.value })} /></Field>
 
-              {editingProductId ? (
-                <>
-                  <Field label="Size"><Input value={product.size || ''} onChange={(event) => setProduct({ ...product, size: event.target.value })} placeholder="Optional" /></Field>
-                  <label className="check">
-                    <input type="checkbox" checked={product.active !== false} onChange={(event) => setProduct({ ...product, active: event.target.checked })} />
-                    Product active
-                  </label>
-                </>
-              ) : selectedCategory.sizes.length > 0 ? (
+              {selectedCategory.sizes.length > 0 ? (
                 <Field label={selectedCategory.sizeLabel} hint="Pick all sizes you have. You can add a custom size too.">
                   <div className="stack">
                     <div className="size-picker">
@@ -306,12 +288,11 @@ export default function AdminView() {
               )}
 
               <div className="row">
-                <Button type="submit">{editingProductId ? 'Update product' : 'Save product'}</Button>
-                {editingProductId && <Button type="button" variant="ghost" onClick={() => { setEditingProductId(null); setProduct(blankProduct); setCustomSize(''); }}>Cancel</Button>}
+                <Button type="submit">Save product</Button>
               </div>
             </form>
           </Card>
-          <Card title={editingCategoryId ? 'Edit category' : 'Add category'} subtitle="Create or update product categories and their size options.">
+          <Card title="Add category" subtitle="Create product categories and their size options. Edit existing categories right in the table below.">
             <form className="form-grid" onSubmit={async (event) => {
               event.preventDefault();
               const payload = {
@@ -320,105 +301,89 @@ export default function AdminView() {
                 sizes: category.sizes,
                 active: category.active
               };
-              if (editingCategoryId) {
-                const done = await admin.updateCategory({ ...payload, id: editingCategoryId });
-                if (done) {
-                  setEditingCategoryId(null);
-                  setCategory(blankCategory);
-                }
-              } else {
-                create(admin.createCategory, payload, () => setCategory(blankCategory));
-              }
+              create(admin.createCategory, payload, () => setCategory(blankCategory));
             }}>
               <Field label="Category name"><Input value={category.name} onChange={(event) => setCategory({ ...category, name: event.target.value })} required /></Field>
               <Field label="Size label" hint="Example: Shoe size, Waist size, Size"><Input value={category.sizeLabel} onChange={(event) => setCategory({ ...category, sizeLabel: event.target.value })} /></Field>
               <Field label="Sizes" hint="Comma-separated. Leave blank for no-size items."><Input value={category.sizes} onChange={(event) => setCategory({ ...category, sizes: event.target.value })} placeholder="e.g. 38, 39, 40 or S, M, L" /></Field>
-              {editingCategoryId && (
-                <label className="check">
-                  <input type="checkbox" checked={category.active !== false} onChange={(event) => setCategory({ ...category, active: event.target.checked })} />
-                  Category active
-                </label>
-              )}
               <div className="row">
-                <Button type="submit">{editingCategoryId ? 'Update category' : 'Save category'}</Button>
-                {editingCategoryId && <Button type="button" variant="ghost" onClick={() => { setEditingCategoryId(null); setCategory(blankCategory); }}>Cancel</Button>}
+                <Button type="submit">Save category</Button>
               </div>
             </form>
           </Card>
-          <Card title="Categories">
+          <Card title="Categories" subtitle="Use Edit to change a category right in the table. Enter saves, Esc cancels.">
             <DataTable
               sortable
+              onSaveEdit={(row, draft) => admin.updateCategory({
+                id: row.id,
+                name: draft.name,
+                sizeLabel: draft.sizeLabel,
+                sizes: draft.sizes,
+                active: row.active
+              })}
               columns={[
-                { key: 'name', label: 'Name', render: (row) => row.name },
-                { key: 'sizes', label: 'Sizes', render: (row) => row.sizes?.length ? row.sizes.join(', ') : 'No size' },
+                { key: 'name', label: 'Name', editable: true, render: (row) => row.name },
+                { key: 'sizeLabel', label: 'Size label', editable: true, editValue: (row) => row.sizeLabel || 'Size', render: (row) => row.sizeLabel || 'Size' },
+                { key: 'sizes', label: 'Sizes', editable: true, editValue: (row) => Array.isArray(row.sizes) ? row.sizes.join(', ') : '', render: (row) => row.sizes?.length ? row.sizes.join(', ') : 'No size' },
                 { key: 'status', label: 'Status', render: (row) => row.active ? <Badge tone="success">Active</Badge> : <Badge>Inactive</Badge> },
-                { key: 'action', label: '', render: (row) => (
-                  <div className="row">
-                    <Button variant="ghost" onClick={() => {
-                      setEditingCategoryId(row.id);
-                      setCategory({
-                        name: row.name,
-                        sizeLabel: row.sizeLabel || 'Size',
-                        sizes: Array.isArray(row.sizes) ? row.sizes.join(', ') : '',
-                        active: Boolean(row.active)
-                      });
-                    }}>Edit</Button>
-                    <Button variant="ghost" onClick={() => {
-                      if (row.active && !window.confirm(`Deactivate category "${row.name}"?`)) return;
-                      admin.updateCategory({
-                        id: row.id,
-                        name: row.name,
-                        sizeLabel: row.sizeLabel || 'Size',
-                        sizes: Array.isArray(row.sizes) ? row.sizes : [],
-                        active: !row.active
-                      });
-                    }}>{row.active ? 'Deactivate' : 'Activate'}</Button>
-                  </div>
-                ) }
+                { key: 'action', label: '', render: (row, helpers) => inlineActions(row, helpers, (
+                  <Button variant="ghost" onClick={() => {
+                    if (row.active && !window.confirm(`Deactivate category "${row.name}"?`)) return;
+                    admin.updateCategory({
+                      id: row.id,
+                      name: row.name,
+                      sizeLabel: row.sizeLabel || 'Size',
+                      sizes: Array.isArray(row.sizes) ? row.sizes : [],
+                      active: !row.active
+                    });
+                  }}>{row.active ? 'Deactivate' : 'Activate'}</Button>
+                )) }
               ]}
               rows={filteredCategories}
               empty={q ? 'No categories match your search.' : 'No categories yet.'}
             />
           </Card>
-          <Card title="Products">
+          <Card title="Products" subtitle="Use Edit to change a product right in the table. Codes stay fixed to protect sales history.">
             <DataTable
               sortable
+              onSaveEdit={(row, draft) => admin.updateProduct({
+                id: row.id,
+                name: draft.name,
+                category: draft.category,
+                size: draft.size,
+                price: draft.price,
+                cost: draft.cost,
+                active: row.active
+              })}
               columns={[
                 { key: 'sku', label: 'Code', render: (row) => row.sku },
-                { key: 'name', label: 'Name', render: (row) => displayProductName(row.name, row.size) },
-                { key: 'category', label: 'Category', render: (row) => resolveCategoryLabel(row.category) },
-                { key: 'price', label: 'Price', render: (row) => money(row.price) },
+                { key: 'name', label: 'Name', editable: true, render: (row) => row.name },
+                { key: 'size', label: 'Size', editable: true, editValue: (row) => row.size || '', render: (row) => row.size || '—' },
+                { key: 'category', label: 'Category', editable: true,
+                  editValue: (row) => row.category || 'other',
+                  editRender: (value, onChange) => (
+                    <Select value={value} onChange={(event) => onChange(event.target.value)} aria-label="Edit category">
+                      {categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                    </Select>
+                  ),
+                  render: (row) => resolveCategoryLabel(row.category) },
+                { key: 'price', label: 'Price', editable: true, editType: 'number', editValue: (row) => String(row.price ?? ''), render: (row) => money(row.price) },
+                { key: 'cost', label: 'Cost', editable: true, editType: 'number', editValue: (row) => String(row.cost ?? ''), render: (row) => row.cost != null ? money(row.cost) : '—' },
                 { key: 'status', label: 'Status', render: (row) => row.active ? <Badge tone="success">Active</Badge> : <Badge>Inactive</Badge> },
-                { key: 'action', label: '', render: (row) => (
-                  <div className="row">
-                    <Button variant="ghost" onClick={() => {
-                      setEditingProductId(row.id);
-                      setProduct({
-                        name: row.name,
-                        category: row.category || 'other',
-                        sku: row.sku,
-                        size: row.size || '',
-                        sizes: [],
-                        price: String(row.price ?? ''),
-                        cost: String(row.cost ?? ''),
-                        openingStock: '',
-                        active: Boolean(row.active)
-                      });
-                    }}>Edit</Button>
-                    <Button variant="ghost" onClick={() => {
-                      if (row.active && !window.confirm(`Deactivate ${displayProductName(row.name, row.size)}?`)) return;
-                      admin.updateProduct({
-                        id: row.id,
-                        name: row.name,
-                        category: row.category || 'other',
-                        size: row.size,
-                        price: row.price,
-                        cost: row.cost,
-                        active: !row.active
-                      });
-                    }}>{row.active ? 'Deactivate' : 'Activate'}</Button>
-                  </div>
-                ) }
+                { key: 'action', label: '', render: (row, helpers) => inlineActions(row, helpers, (
+                  <Button variant="ghost" onClick={() => {
+                    if (row.active && !window.confirm(`Deactivate ${displayProductName(row.name, row.size)}?`)) return;
+                    admin.updateProduct({
+                      id: row.id,
+                      name: row.name,
+                      category: row.category || 'other',
+                      size: row.size,
+                      price: row.price,
+                      cost: row.cost,
+                      active: !row.active
+                    });
+                  }}>{row.active ? 'Deactivate' : 'Activate'}</Button>
+                )) }
               ]}
               rows={filteredProducts}
               empty={q ? 'No products match your search.' : 'No products yet.'}
@@ -514,16 +479,26 @@ export default function AdminView() {
               </div>
             </form>
           </Card>
-          <Card title="Customers" actions={<Button variant="secondary" onClick={downloadCustomers}>Export JSON</Button>}>
+          <Card title="Customers" subtitle="Edit name and contact details in the table; use Details for credit limit, tags and notes." actions={<Button variant="secondary" onClick={downloadCustomers}>Export JSON</Button>}>
             <DataTable
               sortable
+              onSaveEdit={(row, draft) => admin.updateCustomer({
+                id: row.id,
+                name: draft.name,
+                phone: draft.phone,
+                email: draft.email,
+                tags: row.tags,
+                notes: row.notes,
+                creditLimit: row.credit_limit ?? 0,
+                active: row.active !== 0
+              })}
               columns={[
-                { key: 'name', label: 'Name', render: (row) => row.name },
-                { key: 'phone', label: 'Phone', render: (row) => row.phone || '—' },
-                { key: 'email', label: 'Email', render: (row) => row.email || '—' },
+                { key: 'name', label: 'Name', editable: true, render: (row) => row.name },
+                { key: 'phone', label: 'Phone', editable: true, render: (row) => row.phone || '—' },
+                { key: 'email', label: 'Email', editable: true, render: (row) => row.email || '—' },
                 { key: 'status', label: 'Status', render: (row) => row.active === 0 ? <Badge>Inactive</Badge> : <Badge tone="success">Active</Badge> },
-                { key: 'action', label: '', render: (row) => (
-                  <div className="row">
+                { key: 'action', label: '', render: (row, helpers) => inlineActions(row, helpers, (
+                  <>
                     <Button variant="ghost" onClick={() => {
                       setEditingCustomerId(row.id);
                       setCustomer({
@@ -536,7 +511,8 @@ export default function AdminView() {
                         notes: row.notes || '',
                         active: row.active !== 0
                       });
-                    }}>Edit</Button>
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}>Details</Button>
                     <Button variant="ghost" onClick={() => {
                       if (row.active !== 0 && !window.confirm(`Deactivate ${row.name}?`)) return;
                       admin.updateCustomer({
@@ -550,8 +526,8 @@ export default function AdminView() {
                         active: row.active === 0
                       });
                     }}>{row.active === 0 ? 'Activate' : 'Deactivate'}</Button>
-                  </div>
-                ) }
+                  </>
+                )) }
               ]}
               rows={filteredCustomers}
               empty={q ? 'No customers match your search.' : 'No customers yet.'}
@@ -621,17 +597,41 @@ export default function AdminView() {
               </div>
             </form>
           </Card>
-          <Card title="Staff">
+          <Card title="Staff" subtitle="Edit details in the table; use Details to set a new PIN or password.">
             <DataTable
               sortable
+              onSaveEdit={(row, draft) => admin.updateUser({
+                id: row.id,
+                name: draft.name,
+                username: draft.username,
+                role: draft.role,
+                branchId: draft.branchId,
+                active: row.active
+              })}
               columns={[
-                { key: 'name', label: 'Name', render: (row) => row.name },
-                { key: 'username', label: 'Username', render: (row) => row.username },
-                { key: 'role', label: 'Role', render: (row) => <Badge>{row.role}</Badge> },
-                { key: 'branch', label: 'Branch', render: (row) => admin.branches.find((b) => b.id === row.branch_id)?.name || 'All' },
+                { key: 'name', label: 'Name', editable: true, render: (row) => row.name },
+                { key: 'username', label: 'Username', editable: true, render: (row) => row.username },
+                { key: 'role', label: 'Role', editable: true,
+                  editValue: (row) => row.role || 'cashier',
+                  editRender: (value, onChange) => (
+                    <Select value={value} onChange={(event) => onChange(event.target.value)} aria-label="Edit role">
+                      <option value="cashier">Cashier</option>
+                      <option value="admin">Admin</option>
+                    </Select>
+                  ),
+                  render: (row) => <Badge>{row.role}</Badge> },
+                { key: 'branch', label: 'Branch', editable: true,
+                  editValue: (row) => row.branch_id ? String(row.branch_id) : '',
+                  editRender: (value, onChange) => (
+                    <Select value={value} onChange={(event) => onChange(event.target.value)} aria-label="Edit branch">
+                      <option value="">All branches</option>
+                      {admin.branches.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                    </Select>
+                  ),
+                  render: (row) => admin.branches.find((b) => b.id === row.branch_id)?.name || 'All' },
                 { key: 'status', label: 'Status', render: (row) => row.active ? <Badge tone="success">Active</Badge> : <Badge>Inactive</Badge> },
-                { key: 'action', label: '', render: (row) => (
-                  <div className="row">
+                { key: 'action', label: '', render: (row, helpers) => inlineActions(row, helpers, (
+                  <>
                     <Button variant="ghost" onClick={() => {
                       setEditingUserId(row.id);
                       setStaff({
@@ -643,7 +643,8 @@ export default function AdminView() {
                         password: '',
                         active: Boolean(row.active)
                       });
-                    }}>Edit</Button>
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}>Details</Button>
                     <Button variant="ghost" onClick={() => {
                       if (row.active && !window.confirm(`Deactivate ${row.name}? They will no longer be able to sign in.`)) return;
                       admin.updateUser({
@@ -655,8 +656,8 @@ export default function AdminView() {
                         active: !row.active
                       });
                     }}>{row.active ? 'Deactivate' : 'Activate'}</Button>
-                  </div>
-                ) }
+                  </>
+                )) }
               ]}
               rows={filteredUsers}
               empty={q ? 'No staff match your search.' : 'No staff yet.'}
@@ -667,46 +668,40 @@ export default function AdminView() {
 
       {admin.tab === 'Branches' && (
         <div className="stack">
-          <Card title={editingBranchId ? 'Edit branch' : 'Add branch'}>
+          <Card title="Add branch" subtitle="Edit existing branches right in the table below.">
             <form className="form-grid" onSubmit={async (event) => {
               event.preventDefault();
-              if (editingBranchId) {
-                const done = await admin.updateBranch({ ...branch, id: editingBranchId });
-                if (done) {
-                  setEditingBranchId(null);
-                  setBranch(blankBranch);
-                }
-              } else {
-                create(admin.createBranch, branch, () => setBranch(blankBranch));
-              }
+              create(admin.createBranch, branch, () => setBranch(blankBranch));
             }}>
               <Field label="Name"><Input value={branch.name} onChange={(event) => setBranch({ ...branch, name: event.target.value })} required /></Field>
               <Field label="Code"><Input value={branch.code} onChange={(event) => setBranch({ ...branch, code: event.target.value })} /></Field>
-              {editingBranchId && (
-                <label className="check">
-                  <input type="checkbox" checked={branch.active} onChange={(event) => setBranch({ ...branch, active: event.target.checked })} />
-                  Branch active
-                </label>
-              )}
               <div className="row">
-                <Button type="submit">{editingBranchId ? 'Update branch' : 'Save branch'}</Button>
-                {editingBranchId && <Button type="button" variant="ghost" onClick={() => { setEditingBranchId(null); setBranch(blankBranch); }}>Cancel</Button>}
+                <Button type="submit">Save branch</Button>
               </div>
             </form>
           </Card>
           <Card title="Branches">
             <DataTable
               sortable
+              onSaveEdit={(row, draft) => admin.updateBranch({
+                id: row.id,
+                name: draft.name,
+                code: draft.code,
+                active: draft.active
+              })}
               columns={[
-                { key: 'name', label: 'Name', render: (row) => row.name },
-                { key: 'code', label: 'Code', render: (row) => row.code },
-                { key: 'status', label: 'Status', render: (row) => row.active ? <Badge tone="success">Active</Badge> : <Badge>Inactive</Badge> },
-                { key: 'action', label: '', render: (row) => (
-                  <Button variant="ghost" onClick={() => {
-                    setEditingBranchId(row.id);
-                    setBranch({ name: row.name, code: row.code, active: Boolean(row.active) });
-                  }}>Edit</Button>
-                ) }
+                { key: 'name', label: 'Name', editable: true, render: (row) => row.name },
+                { key: 'code', label: 'Code', editable: true, render: (row) => row.code },
+                { key: 'active', label: 'Status', editable: true,
+                  editValue: (row) => Boolean(row.active),
+                  editRender: (value, onChange) => (
+                    <label className="check">
+                      <input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange(event.target.checked)} />
+                      Active
+                    </label>
+                  ),
+                  render: (row) => row.active ? <Badge tone="success">Active</Badge> : <Badge>Inactive</Badge> },
+                { key: 'action', label: '', render: (row, helpers) => inlineActions(row, helpers) }
               ]}
               rows={filteredBranches}
               empty={q ? 'No branches match your search.' : 'No branches yet.'}

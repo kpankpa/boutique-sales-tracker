@@ -8,6 +8,27 @@ import { categoryLabel, displayProductName } from '../models/productOptions';
 import { money, dateTime } from './format';
 import { Badge, Button, Card, DataTable, Field, Input, Modal, Select, Shell } from './components/ui';
 
+const FAVORITES_KEY = 'slawn.pos.favorites';
+const RECENT_KEY = 'slawn.pos.recent';
+
+function readStoredList(key) {
+  if (typeof window === 'undefined') return [];
+  try {
+    const value = JSON.parse(window.localStorage.getItem(key) || '[]');
+    return Array.isArray(value) ? value.filter((entry) => typeof entry === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredList(key, value) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Storage unavailable (private mode etc.) — pinning just won't persist.
+  }
+}
+
 function stockShortfall(record) {
   if (record.conflict?.code !== 'INSUFFICIENT_STOCK' || !record.conflict.details) return null;
   const requested = Number(record.conflict.details.requested) || 0;
@@ -35,6 +56,8 @@ export default function PosView() {
   const [fixQty, setFixQty] = useState({});
   const [productSearch, setProductSearch] = useState('');
   const [removedLine, setRemovedLine] = useState(null);
+  const [favorites, setFavorites] = useState(() => readStoredList(FAVORITES_KEY));
+  const [recent, setRecent] = useState(() => readStoredList(RECENT_KEY));
 
   useEffect(() => {
     if (!removedLine) return;
@@ -65,12 +88,19 @@ export default function PosView() {
 
   const visibleGroups = useMemo(() => {
     const query = productSearch.trim().toLowerCase();
-    if (!query) return productGroups;
-    return productGroups.filter((group) =>
+    const filtered = !query ? productGroups : productGroups.filter((group) =>
       [group.name, categoryLabel(group.category), ...group.variants.map((variant) => variant.sku)]
         .some((value) => String(value || '').toLowerCase().includes(query))
     );
-  }, [productGroups, productSearch]);
+    const rank = (group) => {
+      const favoriteIndex = favorites.indexOf(group.key);
+      if (favoriteIndex >= 0) return favoriteIndex;
+      const recentIndex = recent.indexOf(group.key);
+      if (recentIndex >= 0) return 1000 + recentIndex;
+      return 2000;
+    };
+    return [...filtered].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+  }, [productGroups, productSearch, favorites, recent]);
 
   useEffect(() => {
     if (!loading && !user) router.replace('/login');
@@ -78,9 +108,48 @@ export default function PosView() {
 
   if (loading || !user) return <div className="center-screen"><p>Loading…</p></div>;
 
+  const toggleFavorite = (key) => {
+    const next = favorites.includes(key)
+      ? favorites.filter((entry) => entry !== key)
+      : [...favorites, key];
+    setFavorites(next);
+    writeStoredList(FAVORITES_KEY, next);
+  };
+
+  const recordRecent = (key) => {
+    const next = [key, ...recent.filter((entry) => entry !== key)].slice(0, 8);
+    setRecent(next);
+    writeStoredList(RECENT_KEY, next);
+  };
+
+  const chooseGroup = (group) => {
+    recordRecent(group.key);
+    const hasSizes = group.variants.length > 1 || group.variants.some((variant) => variant.size);
+    if (hasSizes) setSizeGroup(group);
+    else pos.addProduct(group.variants[0]);
+  };
+
+  const groupStock = (group) => {
+    let total = 0;
+    let low = false;
+    for (const variant of group.variants) {
+      const record = pos.stockBySku[variant.sku];
+      const qty = record ? Number(record.qty) : 0;
+      total += qty;
+      if (record && qty <= Number(record.low_at)) low = true;
+    }
+    if (total <= 0) return { tone: 'danger', label: 'Out of stock' };
+    if (low) return { tone: 'warning', label: 'Low stock' };
+    return null;
+  };
+
   const addCode = (event) => {
     event.preventDefault();
-    if (pos.addByCode(code)) setCode('');
+    if (pos.addByCode(code)) {
+      const product = pos.products.find((item) => item.sku === code.trim().toUpperCase());
+      if (product) recordRecent(`${product.category || 'other'}||${product.name}`);
+      setCode('');
+    }
   };
 
   const saveCustomer = async (event) => {
@@ -182,7 +251,7 @@ export default function PosView() {
       )}
 
       <div className="pos-grid">
-        <Card title="Products" subtitle="Tap an item or type its code.">
+        <Card title="Products" subtitle="Tap an item or type its code. Star pins favourites to the top.">
           <form className="row" onSubmit={addCode}>
             <Input value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="Item code" autoFocus aria-label="Item code" />
             <Button type="submit">Add</Button>
@@ -195,13 +264,35 @@ export default function PosView() {
             {visibleGroups.map((group) => {
               const hasSizes = group.variants.length > 1 || group.variants.some((variant) => variant.size);
               const price = group.variants[0]?.price;
+              const stock = groupStock(group);
+              const isFavorite = favorites.includes(group.key);
               return (
-                <button
+                <div
                   key={group.key}
-                  type="button"
-                  className="product"
-                  onClick={() => (hasSizes ? setSizeGroup(group) : pos.addProduct(group.variants[0]))}
+                  role="button"
+                  tabIndex={0}
+                  className={isFavorite ? 'product is-favorite' : 'product'}
+                  onClick={() => chooseGroup(group)}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      chooseGroup(group);
+                    }
+                  }}
                 >
+                  <button
+                    type="button"
+                    className="product-pin"
+                    aria-pressed={isFavorite}
+                    aria-label={isFavorite ? `Unpin ${group.name}` : `Pin ${group.name}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      toggleFavorite(group.key);
+                    }}
+                  >
+                    {isFavorite ? '★' : '☆'}
+                  </button>
                   <strong>{group.name}</strong>
                   <span>{categoryLabel(group.category)}</span>
                   {hasSizes ? (
@@ -209,8 +300,9 @@ export default function PosView() {
                   ) : (
                     <span>{group.variants[0]?.sku}</span>
                   )}
+                  {stock && <span className="product-stock"><Badge tone={stock.tone}>{stock.label}</Badge></span>}
                   <span className="product-price">{money(price)}</span>
-                </button>
+                </div>
               );
             })}
             {!visibleGroups.length && <p className="muted">{productSearch ? 'No products match your search.' : 'No products yet. Ask the admin to add some.'}</p>}
@@ -283,20 +375,28 @@ export default function PosView() {
           <div className="stack">
             <p className="muted">{categoryLabel(sizeGroup.category)}. Pick the size the customer is buying.</p>
             <div className="size-picker">
-              {sizeGroup.variants.map((variant) => (
-                <button
-                  key={variant.id}
-                  type="button"
-                  className="size-chip size-chip-large"
-                  onClick={() => {
-                    pos.addProduct(variant);
-                    setSizeGroup(null);
-                  }}
-                >
-                  <strong>{variant.size || 'One size'}</strong>
-                  <small>{money(variant.price)}</small>
-                </button>
-              ))}
+              {sizeGroup.variants.map((variant) => {
+                const record = pos.stockBySku[variant.sku];
+                const qty = record ? Number(record.qty) : 0;
+                const out = qty <= 0;
+                const low = !out && record && qty <= Number(record.low_at);
+                return (
+                  <button
+                    key={variant.id}
+                    type="button"
+                    className="size-chip size-chip-large"
+                    disabled={out}
+                    onClick={() => {
+                      pos.addProduct(variant);
+                      setSizeGroup(null);
+                    }}
+                  >
+                    <strong>{variant.size || 'One size'}</strong>
+                    <small>{money(variant.price)}</small>
+                    <small>{out ? 'Out of stock' : low ? `Low · ${qty} left` : `${qty} left`}</small>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </Modal>

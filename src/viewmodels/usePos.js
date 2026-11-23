@@ -22,6 +22,7 @@ export function usePos() {
   const [customers, setCustomers] = useState([]);
   const [branches, setBranches] = useState([]);
   const [sales, setSales] = useState([]);
+  const [stock, setStock] = useState([]);
   const [cart, setCart] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [customerId, setCustomerId] = useState('');
@@ -35,16 +36,18 @@ export function usePos() {
 
   const load = useCallback(async () => {
     try {
-      const [meta, productList, customerList, saleList] = await Promise.all([
+      const [meta, productList, customerList, saleList, stockList] = await Promise.all([
         apiGet('/meta'),
         apiGet('/products'),
         apiGet('/customers'),
-        apiGet('/sales?limit=15')
+        apiGet('/sales?limit=15'),
+        apiGet('/stock')
       ]);
       setBranches(meta.branches);
       setProducts(productList);
       setCustomers(customerList);
       setSales(saleList);
+      setStock(stockList);
     } catch (failure) {
       setError(failure.message);
     }
@@ -246,6 +249,7 @@ export function usePos() {
     try {
       await apiPost('/stock', payload);
       setError('');
+      await load();
       return true;
     } catch (failure) {
       setError(failure.message);
@@ -267,11 +271,22 @@ export function usePos() {
 
   const conflicts = queue.filter((record) => record.status === 'conflict');
 
+  const stockBySku = useMemo(() => {
+    const branchId = branches[0]?.id;
+    const map = {};
+    for (const row of stock) {
+      if (branchId != null && Number(row.branch_id) !== Number(branchId)) continue;
+      map[row.sku] = row;
+    }
+    return map;
+  }, [stock, branches]);
+
   return {
     products,
     customers,
     branches,
     sales,
+    stockBySku,
     cart,
     cartTotal,
     paymentMethod,

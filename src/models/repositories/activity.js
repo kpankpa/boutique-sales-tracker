@@ -16,7 +16,7 @@ export async function adjustStock(branchId, productId, quantityChange, executor 
   });
 }
 
-export async function listStock(limit = 200) {
+export async function listStock({ limit = 200, branchId = null } = {}) {
   const result = await database.execute({
     sql: `SELECT b.id AS branch_id, b.name AS branch_name,
                  p.id AS product_id, p.sku, p.name AS product_name, p.category, p.size,
@@ -24,9 +24,10 @@ export async function listStock(limit = 200) {
           FROM stock s
           JOIN branches b ON b.id = s.branch_id
           JOIN products p ON p.id = s.product_id
+          WHERE (? IS NULL OR s.branch_id = ?)
           ORDER BY b.name ASC, p.name ASC, p.size ASC, p.sku ASC
           LIMIT ?`,
-    args: [limit]
+    args: [branchId, branchId, limit]
   });
   return result.rows;
 }

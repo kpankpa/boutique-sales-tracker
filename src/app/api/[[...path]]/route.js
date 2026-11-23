@@ -206,9 +206,10 @@ async function handle(request, context) {
     }
 
     if (key === 'stock' && method === 'GET') {
-      const denied = requireAdmin(user);
-      if (denied) return denied;
-      return ok(await listStock());
+      const branchId = user.role === 'cashier'
+        ? user.branchId
+        : Number(request.nextUrl.searchParams.get('branchId')) || null;
+      return ok(await listStock({ branchId }));
     }
     if (key === 'stock' && method === 'POST') {
       const body = await request.json().catch(() => ({}));
