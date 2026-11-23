@@ -164,6 +164,14 @@ export function usePos() {
 
   const removeLine = (sku) => setCart((current) => current.filter((line) => line.sku !== sku));
 
+  const restoreLine = (line) => {
+    setReceipt(null);
+    setCart((current) => {
+      if (current.some((entry) => entry.sku === line.sku)) return current;
+      return [...current, { ...line, qty: Number(line.qty) || 1 }];
+    });
+  };
+
   const addCustomer = async (payload) => {
     try {
       await apiPost('/customers', payload);
@@ -283,6 +291,7 @@ export function usePos() {
     addByCode,
     setQuantity,
     removeLine,
+    restoreLine,
     addCustomer,
     submit,
     syncQueue,

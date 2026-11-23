@@ -41,6 +41,11 @@ export default function AdminView() {
   const [branch, setBranch] = useState(blankBranch);
   const [editingBranchId, setEditingBranchId] = useState(null);
   const [stockAdjustment, setStockAdjustment] = useState(blankStock);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    setSearch('');
+  }, [admin.tab]);
 
   useEffect(() => {
     if (!loading && !user) router.replace('/login');
@@ -77,6 +82,18 @@ export default function AdminView() {
     ?? defaultCategories[defaultCategories.length - 1];
   const resolveCategoryLabel = (id) => categories.find((item) => item.id === id)?.name
     ?? fallbackCategoryLabel(id);
+
+  const q = search.trim().toLowerCase();
+  const match = (...values) => !q || values.some((value) => String(value ?? '').toLowerCase().includes(q));
+  const filteredProducts = admin.products.filter((row) => match(row.name, row.sku, row.category, row.size, resolveCategoryLabel(row.category)));
+  const filteredCategories = categories.filter((row) => match(row.name, row.sizeLabel, ...(row.sizes || [])));
+  const filteredStock = admin.stock.filter((row) => match(row.branch_name, row.sku, row.product_name, row.size));
+  const filteredCustomers = admin.customers.filter((row) => match(row.name, row.phone, row.email, row.tags));
+  const filteredSales = admin.sales.filter((row) => match(row.receipt_no, row.branch_name, row.cashier_name, row.payment_method));
+  const filteredUsers = admin.users.filter((row) => match(row.name, row.username, row.role, admin.branches.find((b) => b.id === row.branch_id)?.name));
+  const filteredBranches = admin.branches.filter((row) => match(row.name, row.code));
+  const filteredOutbox = admin.outbox.filter((row) => match(row.event_type, row.status, row.payload));
+  const filteredAudit = admin.audit.filter((row) => match(row.action, row.entity, row.actor_name, row.details));
 
   const toggleSize = (size) => {
     setProduct((current) => {
@@ -129,8 +146,21 @@ export default function AdminView() {
       links={[{ href: '/pos', label: 'POS' }, { href: '/admin', label: 'Admin' }]}
     >
       <div className="page-head">
-        <h1>Admin</h1>
-        <nav className="tabs">
+        <div className="row-between">
+          <div>
+            <p className="eyebrow">Management</p>
+            <h1>Admin</h1>
+          </div>
+          <div className="page-search">
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={`Search ${admin.tab.toLowerCase()}...`}
+              aria-label={`Search ${admin.tab}`}
+            />
+          </div>
+        </div>
+        <nav className="tabs" aria-label="Admin sections">
           {adminTabs.map((tab) => (
             <button key={tab} type="button" className={tab === admin.tab ? 'active' : ''} onClick={() => admin.setTab(tab)} aria-current={tab === admin.tab ? 'page' : undefined}>
               {tab}
@@ -317,6 +347,7 @@ export default function AdminView() {
           </Card>
           <Card title="Categories">
             <DataTable
+              sortable
               columns={[
                 { key: 'name', label: 'Name', render: (row) => row.name },
                 { key: 'sizes', label: 'Sizes', render: (row) => row.sizes?.length ? row.sizes.join(', ') : 'No size' },
@@ -345,12 +376,13 @@ export default function AdminView() {
                   </div>
                 ) }
               ]}
-              rows={categories}
-              empty="No categories yet."
+              rows={filteredCategories}
+              empty={q ? 'No categories match your search.' : 'No categories yet.'}
             />
           </Card>
           <Card title="Products">
             <DataTable
+              sortable
               columns={[
                 { key: 'sku', label: 'Code', render: (row) => row.sku },
                 { key: 'name', label: 'Name', render: (row) => displayProductName(row.name, row.size) },
@@ -388,8 +420,8 @@ export default function AdminView() {
                   </div>
                 ) }
               ]}
-              rows={admin.products}
-              empty="No products yet."
+              rows={filteredProducts}
+              empty={q ? 'No products match your search.' : 'No products yet.'}
             />
           </Card>
         </div>
@@ -422,6 +454,7 @@ export default function AdminView() {
           </Card>
           <Card title="Stock on hand" subtitle="Every item with a stock record, by branch.">
             <DataTable
+              sortable
               columns={[
                 { key: 'branch', label: 'Branch', render: (row) => row.branch_name },
                 { key: 'sku', label: 'Code', render: (row) => row.sku },
@@ -432,8 +465,8 @@ export default function AdminView() {
                   ? <Badge tone="warning">Low</Badge>
                   : <Badge tone="success">OK</Badge> }
               ]}
-              rows={admin.stock}
-              empty="No stock records yet."
+              rows={filteredStock}
+              empty={q ? 'No stock records match your search.' : 'No stock records yet.'}
             />
           </Card>
         </div>
@@ -483,6 +516,7 @@ export default function AdminView() {
           </Card>
           <Card title="Customers" actions={<Button variant="secondary" onClick={downloadCustomers}>Export JSON</Button>}>
             <DataTable
+              sortable
               columns={[
                 { key: 'name', label: 'Name', render: (row) => row.name },
                 { key: 'phone', label: 'Phone', render: (row) => row.phone || '—' },
@@ -519,8 +553,8 @@ export default function AdminView() {
                   </div>
                 ) }
               ]}
-              rows={admin.customers}
-              empty="No customers yet."
+              rows={filteredCustomers}
+              empty={q ? 'No customers match your search.' : 'No customers yet.'}
             />
           </Card>
         </div>
@@ -529,6 +563,7 @@ export default function AdminView() {
       {admin.tab === 'Sales' && (
         <Card title="All sales">
           <DataTable
+            sortable
             columns={[
               { key: 'receipt', label: 'Receipt', render: (row) => row.receipt_no },
               { key: 'time', label: 'Time', render: (row) => dateTime(row.created_at) },
@@ -537,8 +572,8 @@ export default function AdminView() {
               { key: 'payment', label: 'Payment', render: (row) => row.payment_method },
               { key: 'total', label: 'Total', render: (row) => money(row.total) }
             ]}
-            rows={admin.sales}
-            empty="No sales recorded."
+            rows={filteredSales}
+            empty={q ? 'No sales match your search.' : 'No sales recorded.'}
           />
         </Card>
       )}
@@ -588,6 +623,7 @@ export default function AdminView() {
           </Card>
           <Card title="Staff">
             <DataTable
+              sortable
               columns={[
                 { key: 'name', label: 'Name', render: (row) => row.name },
                 { key: 'username', label: 'Username', render: (row) => row.username },
@@ -622,8 +658,8 @@ export default function AdminView() {
                   </div>
                 ) }
               ]}
-              rows={admin.users}
-              empty="No staff yet."
+              rows={filteredUsers}
+              empty={q ? 'No staff match your search.' : 'No staff yet.'}
             />
           </Card>
         </div>
@@ -660,6 +696,7 @@ export default function AdminView() {
           </Card>
           <Card title="Branches">
             <DataTable
+              sortable
               columns={[
                 { key: 'name', label: 'Name', render: (row) => row.name },
                 { key: 'code', label: 'Code', render: (row) => row.code },
@@ -671,8 +708,8 @@ export default function AdminView() {
                   }}>Edit</Button>
                 ) }
               ]}
-              rows={admin.branches}
-              empty="No branches yet."
+              rows={filteredBranches}
+              empty={q ? 'No branches match your search.' : 'No branches yet.'}
             />
           </Card>
         </div>
@@ -682,6 +719,7 @@ export default function AdminView() {
         <div className="stack">
           <Card title="Notification outbox" subtitle="Events waiting for the future WhatsApp/SMS worker.">
             <DataTable
+              sortable
               columns={[
                 { key: 'id', label: 'ID', render: (row) => row.id },
                 { key: 'type', label: 'Event', render: (row) => row.event_type },
@@ -689,20 +727,21 @@ export default function AdminView() {
                 { key: 'status', label: 'Status', render: (row) => <Badge tone="warning">{row.status}</Badge> },
                 { key: 'created', label: 'Created', render: (row) => dateTime(row.created_at) }
               ]}
-              rows={admin.outbox}
-              empty="No events yet."
+              rows={filteredOutbox}
+              empty={q ? 'No events match your search.' : 'No events yet.'}
             />
           </Card>
           <Card title="Audit log">
             <DataTable
+              sortable
               columns={[
                 { key: 'time', label: 'Time', render: (row) => dateTime(row.created_at) },
                 { key: 'user', label: 'User', render: (row) => row.user_name || 'Installer' },
                 { key: 'action', label: 'Action', render: (row) => row.action },
                 { key: 'entity', label: 'Record', render: (row) => `${row.entity} #${row.entity_id}` }
               ]}
-              rows={admin.audit}
-              empty="No activity yet."
+              rows={filteredAudit}
+              empty={q ? 'No audit entries match your search.' : 'No activity yet.'}
             />
           </Card>
         </div>

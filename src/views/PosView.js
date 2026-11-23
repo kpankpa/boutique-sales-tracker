@@ -33,6 +33,14 @@ export default function PosView() {
   const [sizeGroup, setSizeGroup] = useState(null);
   const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', consent: true });
   const [fixQty, setFixQty] = useState({});
+  const [productSearch, setProductSearch] = useState('');
+  const [removedLine, setRemovedLine] = useState(null);
+
+  useEffect(() => {
+    if (!removedLine) return;
+    const timer = window.setTimeout(() => setRemovedLine(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [removedLine]);
 
   const productGroups = useMemo(() => {
     const groups = new Map();
@@ -54,6 +62,15 @@ export default function PosView() {
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [pos.products]);
+
+  const visibleGroups = useMemo(() => {
+    const query = productSearch.trim().toLowerCase();
+    if (!query) return productGroups;
+    return productGroups.filter((group) =>
+      [group.name, categoryLabel(group.category), ...group.variants.map((variant) => variant.sku)]
+        .some((value) => String(value || '').toLowerCase().includes(query))
+    );
+  }, [productGroups, productSearch]);
 
   useEffect(() => {
     if (!loading && !user) router.replace('/login');
@@ -113,7 +130,7 @@ export default function PosView() {
     { key: 'price', label: 'Price', render: (line) => money(line.price) },
     { key: 'total', label: 'Total', render: (line) => money(line.price * line.qty) },
     { key: 'remove', label: '', render: (line) => (
-      <Button variant="ghost" onClick={() => pos.removeLine(line.sku)} aria-label={`Remove ${displayProductName(line.name, line.size)}`}>×</Button>
+      <Button variant="ghost" onClick={() => { setRemovedLine(line); pos.removeLine(line.sku); }} aria-label={`Remove ${displayProductName(line.name, line.size)}`}>×</Button>
     ) }
   ];
 
@@ -157,16 +174,25 @@ export default function PosView() {
         </div>
       )}
       {pos.receipt?.queued && <div className="alert alert-warn">Saved on this device. It will sync when the internet returns.</div>}
+      {removedLine && (
+        <div className="toast" role="status">
+          <span>Removed {displayProductName(removedLine.name, removedLine.size)}.</span>
+          <Button variant="secondary" onClick={() => { pos.restoreLine(removedLine); setRemovedLine(null); }}>Undo</Button>
+        </div>
+      )}
 
       <div className="pos-grid">
         <Card title="Products" subtitle="Tap an item or type its code.">
           <form className="row" onSubmit={addCode}>
-            <Input value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="Item code" />
+            <Input value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="Item code" autoFocus aria-label="Item code" />
             <Button type="submit">Add</Button>
           </form>
 
+          <div className="product-search">
+            <Input value={productSearch} onChange={(event) => setProductSearch(event.target.value)} placeholder="Search products..." aria-label="Search products" />
+          </div>
           <div className="product-grid">
-            {productGroups.map((group) => {
+            {visibleGroups.map((group) => {
               const hasSizes = group.variants.length > 1 || group.variants.some((variant) => variant.size);
               const price = group.variants[0]?.price;
               return (
@@ -187,7 +213,7 @@ export default function PosView() {
                 </button>
               );
             })}
-            {!productGroups.length && <p className="muted">No products yet. Ask the admin to add some.</p>}
+            {!visibleGroups.length && <p className="muted">{productSearch ? 'No products match your search.' : 'No products yet. Ask the admin to add some.'}</p>}
           </div>
         </Card>
 

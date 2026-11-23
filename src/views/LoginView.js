@@ -39,7 +39,7 @@ export default function LoginView() {
       <Card title="Sign in" subtitle="Use your staff username.">
         <form className="stack" onSubmit={submit}>
           <Field label="Username">
-            <Input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required />
+            <Input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" autoFocus required />
           </Field>
 
           {usePin ? (
