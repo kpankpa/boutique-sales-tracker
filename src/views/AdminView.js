@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from '../viewmodels/useSession';
+import { useBarcodeScanner } from '../viewmodels/useBarcodeScanner';
 import { adminTabs, useAdmin } from '../viewmodels/useAdmin';
 import { apiGet } from '../viewmodels/api';
 import { productCategories as defaultCategories, categoryLabel as fallbackCategoryLabel, displayProductName } from '../models/productOptions';
@@ -13,6 +14,7 @@ import { ReceiptModal } from './components/ReceiptModal';
 import { QrCode } from './components/QrCode';
 import { ImagePicker } from './components/ImagePicker';
 import { Icon } from './components/Icon';
+import { decodeProductQr, productQrValue } from './productQr';
 
 const blankProduct = {
   name: '',
@@ -38,6 +40,10 @@ export default function AdminView() {
   const { user, loading, signOut, sessionExpiring } = useSession();
   const admin = useAdmin();
   const [product, setProduct] = useState(blankProduct);
+  const [editingProductId, setEditingProductId] = useState(null);
+  const [productScanStatus, setProductScanStatus] = useState('');
+  const [productScanError, setProductScanError] = useState(false);
+  const barcodeInputRef = useRef(null);
   const [customSize, setCustomSize] = useState('');
   const [category, setCategory] = useState(blankCategory);
   const [customer, setCustomer] = useState(blankCustomer);
@@ -82,6 +88,78 @@ export default function AdminView() {
       });
     }
   }, []);
+
+  const fillProductForm = (item, mode, message) => {
+    setEditingProductId(mode === 'edit' ? item.id : null);
+    setProduct({
+      ...blankProduct,
+      sku: item.sku || '',
+      name: item.name || '',
+      category: item.category || 'other',
+      size: item.size || '',
+      barcode: item.barcode || '',
+      price: item.price == null ? '' : String(item.price),
+      cost: item.cost == null ? '' : String(item.cost),
+      imageUrl: item.image_url ?? item.imageUrl ?? '',
+      sizes: []
+    });
+    setCustomSize('');
+    setImageError('');
+    setProductScanError(false);
+    setProductScanStatus(message);
+  };
+
+  async function applyProductScan(rawCode) {
+    const code = String(rawCode || '').trim();
+    if (!code) return;
+    setProductScanStatus('');
+    setProductScanError(false);
+
+    const smart = decodeProductQr(code);
+    const lookupCode = smart ? (smart.barcode || smart.sku) : code;
+    if (lookupCode) {
+      try {
+        const found = await apiGet(`/lookup?code=${encodeURIComponent(lookupCode)}`);
+        if (found?.id) {
+          fillProductForm(found, 'edit', `Found ${displayProductName(found.name, found.size)} (${found.sku}). The form is now in edit mode.`);
+          return;
+        }
+      } catch (failure) {
+        if (failure.code !== 'CODE_NOT_FOUND') {
+          setProductScanError(true);
+          setProductScanStatus(failure.message || 'Could not look up that code.');
+          if (!smart) return;
+        }
+      }
+    }
+
+    if (smart) {
+      fillProductForm({
+        sku: smart.sku,
+        name: smart.name,
+        category: smart.category,
+        size: smart.size,
+        barcode: smart.barcode,
+        price: smart.price,
+        cost: smart.cost
+      }, 'add', 'Filled from the QR label. Check the details, then save.');
+      return;
+    }
+
+    setEditingProductId(null);
+    setProduct((current) => ({ ...current, barcode: code }));
+    setProductScanStatus('No saved item matched that code. Barcode entered — add the details below.');
+  }
+
+  const handleHardwareScan = (code, target) => {
+    const isTextInput = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA';
+    if (isTextInput && target !== barcodeInputRef.current) return;
+    applyProductScan(code);
+  };
+
+  useBarcodeScanner(handleHardwareScan, {
+    enabled: admin.tab === 'Products' && !scanTarget && !labelProduct && !showLabelSheet && !showReceiptScanner && !receiptOpen
+  });
 
   if (loading || !user || user.role !== 'admin') {
     return <div className="center-screen"><p>Loading…</p></div>;
@@ -315,7 +393,22 @@ export default function AdminView() {
 
       {admin.tab === 'Products' && (
         <div className="stack">
-          <Card title="Add product" subtitle="Use sizes for shoes, clothes and trousers. Each size gets its own stock record. Edit existing items right in the table below.">
+          <Card
+            title={editingProductId ? 'Edit product' : 'Add product'}
+            subtitle={editingProductId
+              ? 'Prefilled from a scan. Change any detail and save; the item code stays the same here.'
+              : 'Scan a barcode or QR label to fill the form, or type the details below.'}
+            actions={editingProductId ? (
+              <Button variant="ghost" onClick={() => {
+                setEditingProductId(null);
+                setProduct(blankProduct);
+                setProductScanStatus('');
+                setProductScanError(false);
+              }}>
+                <Icon name="plus" size={16} /> New product
+              </Button>
+            ) : null}
+          >
             <form className="form-grid" onSubmit={async (event) => {
               event.preventDefault();
               const payload = {
@@ -334,12 +427,34 @@ export default function AdminView() {
                 payload.size = product.size;
                 payload.barcode = product.barcode;
               }
-              create(admin.createProduct, payload, () => {
+              const saved = editingProductId
+                ? await admin.updateProduct({
+                  id: editingProductId,
+                  name: product.name,
+                  category: product.category,
+                  size: product.size,
+                  barcode: product.barcode,
+                  imageUrl: product.imageUrl,
+                  price: product.price,
+                  cost: product.cost,
+                  active: true
+                })
+                : await admin.createProduct(payload);
+              if (saved) {
                 setProduct(blankProduct);
+                setEditingProductId(null);
                 setCustomSize('');
                 setImageError('');
-              });
+                setProductScanStatus('');
+                setProductScanError(false);
+              }
             }}>
+              {productScanStatus && (
+                <div className={`scan-fill-status${productScanError ? ' is-error' : ''}`} role="status">
+                  <Icon name={productScanError ? 'alert' : 'check'} size={16} />
+                  <span>{productScanStatus}</span>
+                </div>
+              )}
               <Field label="Category">
                 <Select value={product.category} onChange={(event) => setProduct({ ...product, category: event.target.value, sizes: [], size: '' })}>
                   {categories.map((item) => (
@@ -348,8 +463,13 @@ export default function AdminView() {
                 </Select>
               </Field>
               <Field label="Product name"><Input value={product.name} onChange={(event) => setProduct({ ...product, name: event.target.value })} required /></Field>
-              <Field label={product.sizes.length > 0 ? 'Style code' : 'Item code'} hint={product.sizes.length > 0 ? 'Each size becomes CODE-SIZE' : 'Unique code used at the till'}>
-                <Input value={product.sku} onChange={(event) => setProduct({ ...product, sku: event.target.value })} required />
+              <Field label={product.sizes.length > 0 ? 'Style code' : 'Item code'} hint={editingProductId ? 'Kept unchanged when editing a scanned item' : product.sizes.length > 0 ? 'Each size becomes CODE-SIZE' : 'Unique code used at the till'}>
+                <Input
+                  value={product.sku}
+                  disabled={Boolean(editingProductId)}
+                  onChange={(event) => setProduct({ ...product, sku: event.target.value })}
+                  required
+                />
               </Field>
               <Field
                 label="Barcode (optional)"
@@ -359,21 +479,32 @@ export default function AdminView() {
               >
                 <div className="row">
                   <Input
+                    ref={barcodeInputRef}
                     value={product.barcode}
                     disabled={product.sizes.length > 0}
-                    onChange={(event) => setProduct({ ...product, barcode: event.target.value })}
+                    onChange={(event) => setProduct((current) => ({ ...current, barcode: event.target.value }))}
                     placeholder="e.g. 6001234567890"
                   />
                   <Button
                     type="button"
                     variant="secondary"
+                    disabled={product.sizes.length > 0 || !product.barcode.trim()}
+                    onClick={() => applyProductScan(product.barcode)}
+                    title="Look up this code and fill the form"
+                  >
+                    <Icon name="refresh" size={15} /> Fill
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
                     disabled={product.sizes.length > 0}
                     onClick={() => setScanTarget({
-                      title: 'Scan barcode for the new product',
-                      apply: (code) => setProduct((current) => ({ ...current, barcode: code }))
+                      title: 'Scan barcode or QR label',
+                      hint: 'Scan a code or QR label. Existing items open in edit mode; new QR labels fill the form.',
+                      apply: applyProductScan
                     })}
                   >
-                    Scan
+                    <Icon name="scan" size={15} /> Scan
                   </Button>
                 </div>
               </Field>
@@ -387,9 +518,11 @@ export default function AdminView() {
               {imageError && <div className="alert alert-error" role="alert">{imageError}</div>}
               <Field label="Price (GH₵)"><Input type="number" min="0" step="0.01" value={product.price} onChange={(event) => setProduct({ ...product, price: event.target.value })} required /></Field>
               <Field label="Cost (GH₵)"><Input type="number" min="0" step="0.01" value={product.cost} onChange={(event) => setProduct({ ...product, cost: event.target.value })} /></Field>
-              <Field label="Opening stock" hint="Added to every branch, per size"><Input type="number" min="0" step="1" value={product.openingStock} onChange={(event) => setProduct({ ...product, openingStock: event.target.value })} /></Field>
+              {!editingProductId && (
+                <Field label="Opening stock" hint="Added to every branch, per size"><Input type="number" min="0" step="1" value={product.openingStock} onChange={(event) => setProduct({ ...product, openingStock: event.target.value })} /></Field>
+              )}
 
-              {selectedCategory.sizes.length > 0 ? (
+              {selectedCategory.sizes.length > 0 && !editingProductId ? (
                 <Field label={selectedCategory.sizeLabel} hint="Pick all sizes you have. You can add a custom size too.">
                   <div className="stack">
                     <div className="size-picker">
@@ -418,7 +551,7 @@ export default function AdminView() {
               )}
 
               <div className="row">
-                <Button type="submit">Save product</Button>
+                <Button type="submit">{editingProductId ? 'Save changes' : 'Save product'}</Button>
               </div>
             </form>
           </Card>
@@ -974,7 +1107,7 @@ export default function AdminView() {
       {scanTarget && (
         <ScannerModal
           title={scanTarget.title}
-          hint="Point the camera at the barcode, or type it below. The first scan fills the field."
+          hint={scanTarget.hint || 'Point the camera at the barcode, or type it below. The first scan fills the field.'}
           onClose={() => setScanTarget(null)}
           onDetect={(code) => {
             scanTarget.apply(code);
@@ -986,13 +1119,13 @@ export default function AdminView() {
       {labelProduct && (
         <Modal title="Product label" onClose={() => setLabelProduct(null)}>
           <div className="print-area label">
-            <QrCode value={labelProduct.barcode || labelProduct.sku} size={150} alt={`QR code for ${labelProduct.sku}`} />
+            <QrCode value={productQrValue(labelProduct)} size={150} alt={`QR code for ${labelProduct.sku}`} />
             <strong>{displayProductName(labelProduct.name, labelProduct.size)}</strong>
             <span className="label-price">{money(labelProduct.price)}</span>
             <small>{labelProduct.sku}</small>
             {labelProduct.barcode && <small>{labelProduct.barcode}</small>}
           </div>
-          <p className="muted no-print">The QR code contains the barcode (or the item code when there is no barcode), so any scanner can read it at the till.</p>
+          <p className="muted no-print">The QR code carries the item code, name, size, category and prices. Scan it in Admin to refill the product form; any scanner can also read it at the till.</p>
           <div className="row no-print">
             <Button onClick={() => window.print()}>Print label</Button>
             <Button variant="ghost" onClick={() => setLabelProduct(null)}>Close</Button>
@@ -1006,7 +1139,7 @@ export default function AdminView() {
           <div className="print-area label-sheet">
             {filteredProducts.map((row) => (
               <div className="label" key={row.id}>
-                <QrCode value={row.barcode || row.sku} size={90} alt={`QR code for ${row.sku}`} />
+                <QrCode value={productQrValue(row)} size={90} alt={`QR code for ${row.sku}`} />
                 <strong>{displayProductName(row.name, row.size)}</strong>
                 <span className="label-price">{money(row.price)}</span>
                 <small>{row.sku}</small>

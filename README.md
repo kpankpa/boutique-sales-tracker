@@ -108,7 +108,9 @@ Every product can carry a manufacturer barcode (EAN/UPC/Code128, or any code of 
 
 **Scanning flow:** a scan resolves barcode first, then SKU. The POS matches its locally loaded catalogue first, so scanning keeps working offline; when online it also asks `GET /api/lookup?code=` for items added since the page loaded. Scanning an out-of-stock item is blocked with a clear message.
 
-**QR labels:** Admin → Products → **Label** prints a shelf tag with a QR code containing the barcode (or the SKU when there is none), the name, size and price. **Print label sheet** prints one label per product using the current search filter, laid out for A4. Any scanner — hardware or camera — reads these labels at the till.
+**QR labels:** Admin → Products → **Label** prints a shelf tag with a smart QR code carrying the item code, name, category, size, barcode and prices, plus the visible name, size and price. **Print label sheet** prints one label per product using the current search filter, laid out for A4. Any scanner — hardware or camera — reads these labels at the till.
+
+**Scan-to-fill ( Admin → Products ):** the **Scan** button next to Barcode accepts both camera and keyboard-wedge scanners. It first tries to match the code against the catalogue: if the item exists, the form switches to **Edit product** with every field prefilled, so you can restock or correct details immediately. If the scan is one of our smart QR labels for an item not yet in the system, the form is filled as a new product and you only need to review and save. Plain barcodes with no match simply fill the barcode field, as before. The **Fill** button does the same lookup for a code you typed.
 
 **Receipts:** completing a sale opens a printable receipt with a QR code of the receipt number. Tap any receipt number in POS or Admin → Sales (or **Scan receipt** with the camera) to reopen it. Receipt lookup is branch-scoped for cashiers. Printing uses the browser print dialog; only the receipt/label area prints.
 

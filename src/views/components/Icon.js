@@ -33,6 +33,12 @@ const paths = {
       <path d="M20 4v7h-7" />
     </>
   ),
+  scan: (
+    <>
+      <path d="M4 9V6a2 2 0 0 1 2-2h3M15 4h3a2 2 0 0 1 2 2v3M20 15v3a2 2 0 0 1-2 2h-3M9 20H6a2 2 0 0 1-2-2v-3" />
+      <path d="M4 12h16" />
+    </>
+  ),
   minus: <path d="M5 12h14" />,
   plus: <path d="M12 5v14M5 12h14" />,
   chevronDown: <path d="m6 9 6 6 6-6" />

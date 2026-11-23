@@ -49,7 +49,7 @@ export function useBarcodeScanner(onScan, { enabled = true, minLength = 4 } = {}
             event.preventDefault();
             event.stopPropagation();
             reset();
-            handler.current(code);
+            handler.current(code, target);
             return;
           }
         }

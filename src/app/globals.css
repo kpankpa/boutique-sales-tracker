@@ -615,6 +615,30 @@ a.btn:focus-visible {
   justify-content: flex-start;
 }
 
+.scan-fill-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 4px;
+  border-radius: 10px;
+  background: var(--brand-tint);
+  border: 1px solid var(--brand-soft);
+  color: var(--brand-dark);
+  font-size: 13px;
+  animation: fadeUp 180ms ease-out;
+}
+
+.scan-fill-status .icon {
+  margin-top: 2px;
+}
+
+.scan-fill-status.is-error {
+  background: #fef3f2;
+  border-color: #fecdca;
+  color: var(--danger);
+}
+
 .cell-with-icon {
   display: inline-flex;
   align-items: center;
