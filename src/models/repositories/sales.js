@@ -131,7 +131,7 @@ export async function salesForToday(branchId = null) {
           FROM sales s
           LEFT JOIN branches b ON b.id = s.branch_id
           WHERE ${clauses.join(' AND ')}
-          GROUP BY s.branch_id, s.payment_method
+          GROUP BY s.branch_id, b.name, s.payment_method
           ORDER BY b.name ASC`,
     args
   });
