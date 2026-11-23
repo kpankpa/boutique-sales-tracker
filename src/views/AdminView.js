@@ -19,9 +19,9 @@ const blankProduct = {
   openingStock: '',
   active: true
 };
-const blankCategory = { name: '', sizeLabel: 'Size', sizes: '' };
-const blankCustomer = { name: '', phone: '', email: '', consent: true };
-const blankUser = { name: '', username: '', role: 'cashier', branchId: '', pin: '', password: '' };
+const blankCategory = { name: '', sizeLabel: 'Size', sizes: '', active: true };
+const blankCustomer = { name: '', phone: '', email: '', consent: true, creditLimit: '', tags: '', notes: '', active: true };
+const blankUser = { name: '', username: '', role: 'cashier', branchId: '', pin: '', password: '', active: true };
 const blankBranch = { name: '', code: '', active: true };
 const blankStock = { branchId: '', sku: '', delta: '' };
 
@@ -33,8 +33,11 @@ export default function AdminView() {
   const [customSize, setCustomSize] = useState('');
   const [editingProductId, setEditingProductId] = useState(null);
   const [category, setCategory] = useState(blankCategory);
+  const [editingCategoryId, setEditingCategoryId] = useState(null);
   const [customer, setCustomer] = useState(blankCustomer);
+  const [editingCustomerId, setEditingCustomerId] = useState(null);
   const [staff, setStaff] = useState(blankUser);
+  const [editingUserId, setEditingUserId] = useState(null);
   const [branch, setBranch] = useState(blankBranch);
   const [editingBranchId, setEditingBranchId] = useState(null);
   const [stockAdjustment, setStockAdjustment] = useState(blankStock);
@@ -277,20 +280,70 @@ export default function AdminView() {
               </div>
             </form>
           </Card>
-          <Card title="Add category" subtitle="Create a category for products that do not fit the defaults.">
-            <form className="form-grid" onSubmit={(event) => {
+          <Card title={editingCategoryId ? 'Edit category' : 'Add category'} subtitle="Create or update product categories and their size options.">
+            <form className="form-grid" onSubmit={async (event) => {
               event.preventDefault();
-              create(admin.createCategory, {
+              const payload = {
                 name: category.name,
                 sizeLabel: category.sizeLabel,
-                sizes: category.sizes
-              }, () => setCategory(blankCategory));
+                sizes: category.sizes,
+                active: category.active
+              };
+              if (editingCategoryId) {
+                const done = await admin.updateCategory({ ...payload, id: editingCategoryId });
+                if (done) {
+                  setEditingCategoryId(null);
+                  setCategory(blankCategory);
+                }
+              } else {
+                create(admin.createCategory, payload, () => setCategory(blankCategory));
+              }
             }}>
               <Field label="Category name"><Input value={category.name} onChange={(event) => setCategory({ ...category, name: event.target.value })} required /></Field>
               <Field label="Size label" hint="Example: Shoe size, Waist size, Size"><Input value={category.sizeLabel} onChange={(event) => setCategory({ ...category, sizeLabel: event.target.value })} /></Field>
               <Field label="Sizes" hint="Comma-separated. Leave blank for no-size items."><Input value={category.sizes} onChange={(event) => setCategory({ ...category, sizes: event.target.value })} placeholder="e.g. 38, 39, 40 or S, M, L" /></Field>
-              <Button type="submit">Save category</Button>
+              {editingCategoryId && (
+                <label className="check">
+                  <input type="checkbox" checked={category.active !== false} onChange={(event) => setCategory({ ...category, active: event.target.checked })} />
+                  Category active
+                </label>
+              )}
+              <div className="row">
+                <Button type="submit">{editingCategoryId ? 'Update category' : 'Save category'}</Button>
+                {editingCategoryId && <Button type="button" variant="ghost" onClick={() => { setEditingCategoryId(null); setCategory(blankCategory); }}>Cancel</Button>}
+              </div>
             </form>
+          </Card>
+          <Card title="Categories">
+            <DataTable
+              columns={[
+                { key: 'name', label: 'Name', render: (row) => row.name },
+                { key: 'sizes', label: 'Sizes', render: (row) => row.sizes?.length ? row.sizes.join(', ') : 'No size' },
+                { key: 'status', label: 'Status', render: (row) => row.active ? <Badge tone="success">Active</Badge> : <Badge>Inactive</Badge> },
+                { key: 'action', label: '', render: (row) => (
+                  <div className="row">
+                    <Button variant="ghost" onClick={() => {
+                      setEditingCategoryId(row.id);
+                      setCategory({
+                        name: row.name,
+                        sizeLabel: row.sizeLabel || 'Size',
+                        sizes: Array.isArray(row.sizes) ? row.sizes.join(', ') : '',
+                        active: Boolean(row.active)
+                      });
+                    }}>Edit</Button>
+                    <Button variant="ghost" onClick={() => admin.updateCategory({
+                      id: row.id,
+                      name: row.name,
+                      sizeLabel: row.sizeLabel || 'Size',
+                      sizes: Array.isArray(row.sizes) ? row.sizes : [],
+                      active: !row.active
+                    })}>{row.active ? 'Deactivate' : 'Activate'}</Button>
+                  </div>
+                ) }
+              ]}
+              rows={categories}
+              empty="No categories yet."
+            />
           </Card>
           <Card title="Products">
             <DataTable
@@ -381,23 +434,44 @@ export default function AdminView() {
 
       {admin.tab === 'Customers' && (
         <div className="stack">
-          <Card title="Add customer">
-            <form className="form-grid" onSubmit={(event) => {
+          <Card title={editingCustomerId ? 'Edit customer' : 'Add customer'}>
+            <form className="form-grid" onSubmit={async (event) => {
               event.preventDefault();
-              create(admin.createCustomer, customer, () => setCustomer(blankCustomer));
+              if (editingCustomerId) {
+                const done = await admin.updateCustomer({ ...customer, id: editingCustomerId });
+                if (done) {
+                  setEditingCustomerId(null);
+                  setCustomer(blankCustomer);
+                }
+              } else {
+                create(admin.createCustomer, customer, () => setCustomer(blankCustomer));
+              }
             }}>
               <Field label="Name"><Input value={customer.name} onChange={(event) => setCustomer({ ...customer, name: event.target.value })} required /></Field>
               <Field label="Phone"><Input value={customer.phone} onChange={(event) => setCustomer({ ...customer, phone: event.target.value })} /></Field>
               <Field label="Email"><Input value={customer.email} onChange={(event) => setCustomer({ ...customer, email: event.target.value })} /></Field>
-              <label className="check">
-                <input type="checkbox" checked={customer.consent} onChange={(event) => setCustomer({ ...customer, consent: event.target.checked })} />
-                Customer agrees that we may keep these details
-              </label>
-              <p className="muted">
-                We keep these details to record purchases and credit. We do not send marketing.
-                Customers can ask for a copy or deletion at the counter.
-              </p>
-              <Button type="submit">Save customer</Button>
+              <Field label="Credit limit (GH₵)"><Input type="number" min="0" step="0.01" value={customer.creditLimit} onChange={(event) => setCustomer({ ...customer, creditLimit: event.target.value })} /></Field>
+              {!editingCustomerId ? (
+                <>
+                  <label className="check">
+                    <input type="checkbox" checked={customer.consent} onChange={(event) => setCustomer({ ...customer, consent: event.target.checked })} />
+                    Customer agrees that we may keep these details
+                  </label>
+                  <p className="muted">
+                    We keep these details to record purchases and credit. We do not send marketing.
+                    Customers can ask for a copy or deletion at the counter.
+                  </p>
+                </>
+              ) : (
+                <label className="check">
+                  <input type="checkbox" checked={customer.active !== false} onChange={(event) => setCustomer({ ...customer, active: event.target.checked })} />
+                  Customer active
+                </label>
+              )}
+              <div className="row">
+                <Button type="submit">{editingCustomerId ? 'Update customer' : 'Save customer'}</Button>
+                {editingCustomerId && <Button type="button" variant="ghost" onClick={() => { setEditingCustomerId(null); setCustomer(blankCustomer); }}>Cancel</Button>}
+              </div>
             </form>
           </Card>
           <Card title="Customers" actions={<Button variant="secondary" onClick={downloadCustomers}>Export JSON</Button>}>
@@ -405,11 +479,34 @@ export default function AdminView() {
               columns={[
                 { key: 'name', label: 'Name', render: (row) => row.name },
                 { key: 'phone', label: 'Phone', render: (row) => row.phone || '—' },
-                { key: 'consent', label: 'Consent', render: (row) => row.consent_at ? <Badge tone="success">Yes</Badge> : <Badge>No</Badge> },
+                { key: 'email', label: 'Email', render: (row) => row.email || '—' },
                 { key: 'status', label: 'Status', render: (row) => row.active === 0 ? <Badge>Inactive</Badge> : <Badge tone="success">Active</Badge> },
-                { key: 'created', label: 'Added', render: (row) => dateTime(row.created_at) },
-                { key: 'action', label: '', render: (row) => row.active === 0 ? null : (
-                  <Button variant="ghost" onClick={() => deactivateCustomer(row)}>Deactivate</Button>
+                { key: 'action', label: '', render: (row) => (
+                  <div className="row">
+                    <Button variant="ghost" onClick={() => {
+                      setEditingCustomerId(row.id);
+                      setCustomer({
+                        name: row.name || '',
+                        phone: row.phone || '',
+                        email: row.email || '',
+                        consent: Boolean(row.consent_at),
+                        creditLimit: row.credit_limit ?? '',
+                        tags: row.tags || '',
+                        notes: row.notes || '',
+                        active: row.active !== 0
+                      });
+                    }}>Edit</Button>
+                    <Button variant="ghost" onClick={() => admin.updateCustomer({
+                      id: row.id,
+                      name: row.name,
+                      phone: row.phone,
+                      email: row.email,
+                      tags: row.tags,
+                      notes: row.notes,
+                      creditLimit: row.credit_limit ?? 0,
+                      active: row.active === 0
+                    })}>{row.active === 0 ? 'Activate' : 'Deactivate'}</Button>
+                  </div>
                 ) }
               ]}
               rows={admin.customers}
@@ -438,10 +535,18 @@ export default function AdminView() {
 
       {admin.tab === 'Staff' && (
         <div className="stack">
-          <Card title="Add staff">
-            <form className="form-grid" onSubmit={(event) => {
+          <Card title={editingUserId ? 'Edit staff' : 'Add staff'}>
+            <form className="form-grid" onSubmit={async (event) => {
               event.preventDefault();
-              create(admin.createUser, staff, () => setStaff(blankUser));
+              if (editingUserId) {
+                const done = await admin.updateUser({ ...staff, id: editingUserId });
+                if (done) {
+                  setEditingUserId(null);
+                  setStaff(blankUser);
+                }
+              } else {
+                create(admin.createUser, staff, () => setStaff(blankUser));
+              }
             }}>
               <Field label="Name"><Input value={staff.name} onChange={(event) => setStaff({ ...staff, name: event.target.value })} required /></Field>
               <Field label="Username"><Input value={staff.username} onChange={(event) => setStaff({ ...staff, username: event.target.value })} required /></Field>
@@ -457,9 +562,18 @@ export default function AdminView() {
                   {admin.branches.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </Select>
               </Field>
-              <Field label="PIN (cashiers)"><Input value={staff.pin} onChange={(event) => setStaff({ ...staff, pin: event.target.value })} /></Field>
-              <Field label="Password (optional)"><Input type="password" value={staff.password} onChange={(event) => setStaff({ ...staff, password: event.target.value })} /></Field>
-              <Button type="submit">Save staff</Button>
+              <Field label="PIN (cashiers)" hint={editingUserId ? 'Leave blank to keep current PIN' : ''}><Input value={staff.pin} onChange={(event) => setStaff({ ...staff, pin: event.target.value })} /></Field>
+              <Field label={editingUserId ? 'New password (optional)' : 'Password (optional)'} hint={editingUserId ? 'Leave blank to keep current password' : ''}><Input type="password" value={staff.password} onChange={(event) => setStaff({ ...staff, password: event.target.value })} /></Field>
+              {editingUserId && (
+                <label className="check">
+                  <input type="checkbox" checked={staff.active !== false} onChange={(event) => setStaff({ ...staff, active: event.target.checked })} />
+                  Staff active
+                </label>
+              )}
+              <div className="row">
+                <Button type="submit">{editingUserId ? 'Update staff' : 'Save staff'}</Button>
+                {editingUserId && <Button type="button" variant="ghost" onClick={() => { setEditingUserId(null); setStaff(blankUser); }}>Cancel</Button>}
+              </div>
             </form>
           </Card>
           <Card title="Staff">
@@ -468,7 +582,32 @@ export default function AdminView() {
                 { key: 'name', label: 'Name', render: (row) => row.name },
                 { key: 'username', label: 'Username', render: (row) => row.username },
                 { key: 'role', label: 'Role', render: (row) => <Badge>{row.role}</Badge> },
-                { key: 'branch', label: 'Branch', render: (row) => admin.branches.find((b) => b.id === row.branch_id)?.name || 'All' }
+                { key: 'branch', label: 'Branch', render: (row) => admin.branches.find((b) => b.id === row.branch_id)?.name || 'All' },
+                { key: 'status', label: 'Status', render: (row) => row.active ? <Badge tone="success">Active</Badge> : <Badge>Inactive</Badge> },
+                { key: 'action', label: '', render: (row) => (
+                  <div className="row">
+                    <Button variant="ghost" onClick={() => {
+                      setEditingUserId(row.id);
+                      setStaff({
+                        name: row.name || '',
+                        username: row.username || '',
+                        role: row.role || 'cashier',
+                        branchId: row.branch_id ? String(row.branch_id) : '',
+                        pin: '',
+                        password: '',
+                        active: Boolean(row.active)
+                      });
+                    }}>Edit</Button>
+                    <Button variant="ghost" onClick={() => admin.updateUser({
+                      id: row.id,
+                      name: row.name,
+                      username: row.username,
+                      role: row.role,
+                      branchId: row.branch_id,
+                      active: !row.active
+                    })}>{row.active ? 'Deactivate' : 'Activate'}</Button>
+                  </div>
+                ) }
               ]}
               rows={admin.users}
               empty="No staff yet."

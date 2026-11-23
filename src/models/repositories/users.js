@@ -40,3 +40,21 @@ export async function setUserActive(id, active) {
     args: [active ? 1 : 0, id]
   });
 }
+
+export async function updateUser({ id, name, username, passwordHash, pinHash, role, branchId, active }) {
+  const fields = ['name = ?', 'username = ?', 'role = ?', 'branch_id = ?', 'active = ?'];
+  const args = [name, username, role, branchId ?? null, active ? 1 : 0];
+  if (passwordHash !== undefined) {
+    fields.push('password_hash = ?');
+    args.push(passwordHash);
+  }
+  if (pinHash !== undefined) {
+    fields.push('pin_hash = ?');
+    args.push(pinHash);
+  }
+  args.push(id);
+  await database.execute({
+    sql: `UPDATE users SET ${fields.join(', ')} WHERE id = ?`,
+    args
+  });
+}

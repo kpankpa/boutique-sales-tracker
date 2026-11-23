@@ -42,3 +42,12 @@ export async function insertCategory({ id, name, sizeLabel, sizes }) {
   });
   return id;
 }
+
+export async function updateCategory({ id, name, sizeLabel, sizes, active }) {
+  await database.execute({
+    sql: `UPDATE categories
+          SET name = ?, size_label = ?, sizes_json = ?, active = ?
+          WHERE id = ?`,
+    args: [name, sizeLabel, JSON.stringify(sizes), active ? 1 : 0, id]
+  });
+}

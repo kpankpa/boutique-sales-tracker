@@ -43,6 +43,15 @@ export async function setCustomerInactive(id, executor = database) {
   });
 }
 
+export async function updateCustomer({ id, name, phone, email, tags, notes, creditLimit, active }) {
+  await database.execute({
+    sql: `UPDATE customers
+          SET name = ?, phone = ?, email = ?, tags = ?, notes = ?, credit_limit = ?, active = ?
+          WHERE id = ?`,
+    args: [name, phone ?? null, email ?? null, tags ?? null, notes ?? null, creditLimit ?? 0, active ? 1 : 0, id]
+  });
+}
+
 export async function insertCustomer({ name, phone, email, tags, notes, consentAt, creditLimit }) {
   const result = await database.execute({
     sql: `INSERT INTO customers (name, phone, email, tags, notes, consent_at, credit_limit)

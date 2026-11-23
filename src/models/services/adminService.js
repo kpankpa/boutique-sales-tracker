@@ -3,11 +3,11 @@ import { AppError } from '../errors';
 import { withTransaction } from '../database';
 import { hashPassword } from '../security';
 import { findBranchByCode, insertBranch, listBranches, updateBranch } from '../repositories/branches';
-import { findCategoryById, insertCategory } from '../repositories/categories';
+import { findCategoryById, insertCategory, updateCategory } from '../repositories/categories';
 import { addAudit, adjustStock } from '../repositories/activity';
-import { findCustomerByPhone, insertCustomer, setCustomerInactive } from '../repositories/customers';
+import { findCustomerByPhone, insertCustomer, setCustomerInactive, updateCustomer } from '../repositories/customers';
 import { findProductBySku, insertProduct, updateProduct } from '../repositories/products';
-import { findUserByUsername, insertUser } from '../repositories/users';
+import { findUserById, findUserByUsername, insertUser, updateUser } from '../repositories/users';
 import { normalizeCategory, normalizeSize, sizeToken } from '../productOptions';
 import {
   nonNegativeNumber,
@@ -39,6 +39,16 @@ export async function editBranch(input) {
   return { id };
 }
 
+function normalizeCategorySizes(input) {
+  return Array.isArray(input.sizes)
+    ? [...new Set(input.sizes.map((value) => String(value).trim()).filter(Boolean))]
+    : String(input.sizes || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .filter((value, index, list) => list.indexOf(value) === index);
+}
+
 export async function createCategory(input) {
   const name = required(input.name, 'Category name');
   const id = normalizeCategory(input.id || name);
@@ -46,15 +56,21 @@ export async function createCategory(input) {
     throw new AppError('That category already exists.');
   }
   const sizeLabel = String(input.sizeLabel || 'Size').trim() || 'Size';
-  const sizes = Array.isArray(input.sizes)
-    ? [...new Set(input.sizes.map((value) => String(value).trim()).filter(Boolean))]
-    : String(input.sizes || '')
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean)
-        .filter((value, index, list) => list.indexOf(value) === index);
+  const sizes = normalizeCategorySizes(input);
   await insertCategory({ id, name, sizeLabel, sizes });
   return { id, name, sizeLabel, sizes };
+}
+
+export async function editCategory(input) {
+  const id = normalizeCategory(input.id);
+  const existing = await findCategoryById(id);
+  if (!existing) throw new AppError('Choose a category.');
+  const name = required(input.name, 'Category name');
+  const sizeLabel = String(input.sizeLabel || 'Size').trim() || 'Size';
+  const sizes = normalizeCategorySizes(input);
+  const active = input.active !== false && input.active !== 0;
+  await updateCategory({ id, name, sizeLabel, sizes, active });
+  return { id };
 }
 
 function normalizeSizes(input) {
@@ -153,6 +169,30 @@ export async function deactivateCustomer(user, input) {
   return { id };
 }
 
+export async function editCustomer(input) {
+  const id = Number(input.id);
+  if (!Number.isInteger(id) || id <= 0) throw new AppError('Choose a customer.');
+  const name = required(input.name, 'Customer name');
+  const phone = input.phone ? String(input.phone).trim() : null;
+  if (phone) {
+    const existing = await findCustomerByPhone(phone);
+    if (existing && Number(existing.id) !== id) {
+      throw new AppError('A customer with that phone number already exists.');
+    }
+  }
+  await updateCustomer({
+    id,
+    name,
+    phone,
+    email: input.email ? String(input.email).trim() : null,
+    tags: input.tags ? String(input.tags).trim() : null,
+    notes: input.notes ? String(input.notes).trim() : null,
+    creditLimit: nonNegativeNumber(input.creditLimit, 'Credit limit'),
+    active: input.active !== false && input.active !== 0
+  });
+  return { id };
+}
+
 export async function createUser(input) {
   const name = required(input.name, 'Staff name');
   const username = required(input.username, 'Username').toLowerCase();
@@ -194,4 +234,49 @@ export async function createUser(input) {
     branchId,
     pinHash
   });
+}
+
+export async function editUser(input) {
+  const id = Number(input.id);
+  if (!Number.isInteger(id) || id <= 0) throw new AppError('Choose a staff member.');
+  const existing = await findUserById(id);
+  if (!existing) throw new AppError('Choose a staff member.');
+
+  const name = required(input.name, 'Staff name');
+  const username = required(input.username, 'Username').toLowerCase();
+  const role = requireOneOf(input.role, ['admin', 'cashier'], 'Role');
+  const usernameOwner = await findUserByUsername(username);
+  if (usernameOwner && Number(usernameOwner.id) !== id) {
+    throw new AppError('That username is already taken.');
+  }
+
+  const branchId = role === 'cashier' ? Number(input.branchId) : null;
+  if (role === 'cashier' && !branchId) {
+    throw new AppError('Choose a branch for the cashier.');
+  }
+
+  let passwordHash;
+  let pinHash;
+  if (input.password) {
+    const password = String(input.password);
+    if (password.length < 8) throw new AppError('Password must be at least 8 characters.');
+    passwordHash = hashPassword(password);
+  }
+  if (input.pin) {
+    const pin = String(input.pin).trim();
+    if (!/^\d{4,6}$/.test(pin)) throw new AppError('PIN must be 4 to 6 digits.');
+    pinHash = hashPassword(pin);
+  }
+
+  await updateUser({
+    id,
+    name,
+    username,
+    role,
+    branchId,
+    active: input.active !== false && input.active !== 0,
+    passwordHash,
+    pinHash
+  });
+  return { id };
 }

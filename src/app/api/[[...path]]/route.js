@@ -22,7 +22,10 @@ import {
   createUser,
   deactivateCustomer,
   editBranch,
-  editProduct
+  editCategory,
+  editCustomer,
+  editProduct,
+  editUser
 } from '../../../models/services/adminService';
 import { recordSale } from '../../../models/services/saleService';
 import { adjustStockFromInput } from '../../../models/services/stockService';
@@ -136,6 +139,12 @@ async function handle(request, context) {
       const body = await request.json().catch(() => ({}));
       return ok(await createCategory(body));
     }
+    if (key === 'categories/update' && method === 'POST') {
+      const denied = requireAdmin(user);
+      if (denied) return denied;
+      const body = await request.json().catch(() => ({}));
+      return ok(await editCategory(body));
+    }
 
     if (key === 'products' && method === 'GET') return ok(await listProducts());
     if (key === 'products' && method === 'POST') {
@@ -163,6 +172,12 @@ async function handle(request, context) {
       const denied = requireAdmin(user);
       if (denied) return denied;
       return ok(await exportCustomers());
+    }
+    if (key === 'customers/update' && method === 'POST') {
+      const denied = requireAdmin(user);
+      if (denied) return denied;
+      const body = await request.json().catch(() => ({}));
+      return ok(await editCustomer(body));
     }
     if (key === 'customers/deactivate' && method === 'POST') {
       const denied = requireAdmin(user);
@@ -210,6 +225,12 @@ async function handle(request, context) {
       if (denied) return denied;
       const body = await request.json().catch(() => ({}));
       return ok({ id: await createUser(body) });
+    }
+    if (key === 'users/update' && method === 'POST') {
+      const denied = requireAdmin(user);
+      if (denied) return denied;
+      const body = await request.json().catch(() => ({}));
+      return ok(await editUser(body));
     }
 
     if (key === 'branches' && method === 'GET') return ok(await listBranches());
