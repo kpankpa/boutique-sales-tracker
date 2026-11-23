@@ -5,6 +5,8 @@
   --canvas: #f3f6f4;
   --brand: #0b6b4f;
   --brand-dark: #084f3b;
+  --brand-soft: #9fd3c0;
+  --brand-tint: #edf7f3;
   --gold: #d6a434;
   --danger: #b42318;
   --success: #0b6b4f;
@@ -297,6 +299,17 @@ p {
   color: var(--brand);
 }
 
+.btn:focus-visible,
+.input:focus-visible,
+.size-chip:focus-visible,
+.product:focus-visible,
+.tabs button:focus-visible,
+.topnav a:focus-visible,
+a.btn:focus-visible {
+  outline: 3px solid rgba(11, 107, 79, 0.28);
+  outline-offset: 2px;
+}
+
 .check {
   display: flex;
   align-items: center;
@@ -416,6 +429,18 @@ p {
 
 .table small {
   color: var(--ink-soft);
+}
+
+.table td .row {
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.table td .btn {
+  min-height: 34px;
+  padding: 4px 10px;
+  font-size: 13px;
 }
 
 .empty {

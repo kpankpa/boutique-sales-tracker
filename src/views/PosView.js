@@ -107,12 +107,13 @@ export default function PosView() {
         value={line.qty}
         onChange={(event) => pos.setQuantity(line.sku, event.target.value)}
         className="qty-input"
+        aria-label={`Quantity for ${displayProductName(line.name, line.size)}`}
       />
     ) },
     { key: 'price', label: 'Price', render: (line) => money(line.price) },
     { key: 'total', label: 'Total', render: (line) => money(line.price * line.qty) },
     { key: 'remove', label: '', render: (line) => (
-      <Button variant="ghost" onClick={() => pos.removeLine(line.sku)}>×</Button>
+      <Button variant="ghost" onClick={() => pos.removeLine(line.sku)} aria-label={`Remove ${displayProductName(line.name, line.size)}`}>×</Button>
     ) }
   ];
 
@@ -171,6 +172,7 @@ export default function PosView() {
               return (
                 <button
                   key={group.key}
+                  type="button"
                   className="product"
                   onClick={() => (hasSizes ? setSizeGroup(group) : pos.addProduct(group.variants[0]))}
                 >

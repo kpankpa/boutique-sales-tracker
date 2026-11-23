@@ -132,7 +132,7 @@ export default function AdminView() {
         <h1>Admin</h1>
         <nav className="tabs">
           {adminTabs.map((tab) => (
-            <button key={tab} className={tab === admin.tab ? 'active' : ''} onClick={() => admin.setTab(tab)}>
+            <button key={tab} type="button" className={tab === admin.tab ? 'active' : ''} onClick={() => admin.setTab(tab)} aria-current={tab === admin.tab ? 'page' : undefined}>
               {tab}
             </button>
           ))}
@@ -140,7 +140,8 @@ export default function AdminView() {
       </div>
 
       {admin.error && <div className="alert alert-error" role="alert">{admin.error}</div>}
-      {admin.loading && <div className="alert alert-info">Loading…</div>}
+      {admin.message && <div className="alert alert-success" role="status">{admin.message}</div>}
+      {admin.loading && <div className="alert alert-info" role="status">Loading…</div>}
 
       {admin.tab === 'Overview' && (
         <div className="stack">
@@ -331,13 +332,16 @@ export default function AdminView() {
                         active: Boolean(row.active)
                       });
                     }}>Edit</Button>
-                    <Button variant="ghost" onClick={() => admin.updateCategory({
-                      id: row.id,
-                      name: row.name,
-                      sizeLabel: row.sizeLabel || 'Size',
-                      sizes: Array.isArray(row.sizes) ? row.sizes : [],
-                      active: !row.active
-                    })}>{row.active ? 'Deactivate' : 'Activate'}</Button>
+                    <Button variant="ghost" onClick={() => {
+                      if (row.active && !window.confirm(`Deactivate category "${row.name}"?`)) return;
+                      admin.updateCategory({
+                        id: row.id,
+                        name: row.name,
+                        sizeLabel: row.sizeLabel || 'Size',
+                        sizes: Array.isArray(row.sizes) ? row.sizes : [],
+                        active: !row.active
+                      });
+                    }}>{row.active ? 'Deactivate' : 'Activate'}</Button>
                   </div>
                 ) }
               ]}
@@ -369,15 +373,18 @@ export default function AdminView() {
                         active: Boolean(row.active)
                       });
                     }}>Edit</Button>
-                    <Button variant="ghost" onClick={() => admin.updateProduct({
-                      id: row.id,
-                      name: row.name,
-                      category: row.category || 'other',
-                      size: row.size,
-                      price: row.price,
-                      cost: row.cost,
-                      active: !row.active
-                    })}>{row.active ? 'Deactivate' : 'Activate'}</Button>
+                    <Button variant="ghost" onClick={() => {
+                      if (row.active && !window.confirm(`Deactivate ${displayProductName(row.name, row.size)}?`)) return;
+                      admin.updateProduct({
+                        id: row.id,
+                        name: row.name,
+                        category: row.category || 'other',
+                        size: row.size,
+                        price: row.price,
+                        cost: row.cost,
+                        active: !row.active
+                      });
+                    }}>{row.active ? 'Deactivate' : 'Activate'}</Button>
                   </div>
                 ) }
               ]}
@@ -496,16 +503,19 @@ export default function AdminView() {
                         active: row.active !== 0
                       });
                     }}>Edit</Button>
-                    <Button variant="ghost" onClick={() => admin.updateCustomer({
-                      id: row.id,
-                      name: row.name,
-                      phone: row.phone,
-                      email: row.email,
-                      tags: row.tags,
-                      notes: row.notes,
-                      creditLimit: row.credit_limit ?? 0,
-                      active: row.active === 0
-                    })}>{row.active === 0 ? 'Activate' : 'Deactivate'}</Button>
+                    <Button variant="ghost" onClick={() => {
+                      if (row.active !== 0 && !window.confirm(`Deactivate ${row.name}?`)) return;
+                      admin.updateCustomer({
+                        id: row.id,
+                        name: row.name,
+                        phone: row.phone,
+                        email: row.email,
+                        tags: row.tags,
+                        notes: row.notes,
+                        creditLimit: row.credit_limit ?? 0,
+                        active: row.active === 0
+                      });
+                    }}>{row.active === 0 ? 'Activate' : 'Deactivate'}</Button>
                   </div>
                 ) }
               ]}
@@ -598,14 +608,17 @@ export default function AdminView() {
                         active: Boolean(row.active)
                       });
                     }}>Edit</Button>
-                    <Button variant="ghost" onClick={() => admin.updateUser({
-                      id: row.id,
-                      name: row.name,
-                      username: row.username,
-                      role: row.role,
-                      branchId: row.branch_id,
-                      active: !row.active
-                    })}>{row.active ? 'Deactivate' : 'Activate'}</Button>
+                    <Button variant="ghost" onClick={() => {
+                      if (row.active && !window.confirm(`Deactivate ${row.name}? They will no longer be able to sign in.`)) return;
+                      admin.updateUser({
+                        id: row.id,
+                        name: row.name,
+                        username: row.username,
+                        role: row.role,
+                        branchId: row.branch_id,
+                        active: !row.active
+                      });
+                    }}>{row.active ? 'Deactivate' : 'Activate'}</Button>
                   </div>
                 ) }
               ]}

@@ -29,6 +29,7 @@ export function useAdmin() {
   const [audit, setAudit] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -39,6 +40,7 @@ export function useAdmin() {
   const load = useCallback(async (nextTab) => {
     setLoading(true);
     setError('');
+    setMessage('');
     try {
       switch (nextTab) {
         case 'Overview': {
@@ -107,11 +109,13 @@ export function useAdmin() {
     load(tab);
   }, [tab, load]);
 
-  const submit = async (path, payload) => {
+  const submit = async (path, payload, successMessage = 'Saved.') => {
     setError('');
+    setMessage('');
     try {
       await apiPost(path, payload);
       await load(tab);
+      setMessage(successMessage);
       return true;
     } catch (failure) {
       setError(failure.message);
@@ -145,18 +149,19 @@ export function useAdmin() {
     audit,
     loading,
     error,
-    createProduct: (payload) => submit('/products', payload),
-    updateProduct: (payload) => submit('/products/update', payload),
-    createCategory: (payload) => submit('/categories', payload),
-    updateCategory: (payload) => submit('/categories/update', payload),
-    createCustomer: (payload) => submit('/customers', payload),
-    updateCustomer: (payload) => submit('/customers/update', payload),
-    createUser: (payload) => submit('/users', payload),
-    updateUser: (payload) => submit('/users/update', payload),
-    createBranch: (payload) => submit('/branches', payload),
-    updateBranch: (payload) => submit('/branches/update', payload),
-    adjustStock: (payload) => submit('/stock', payload),
-    deactivateCustomer: (payload) => submit('/customers/deactivate', payload),
+    message,
+    createProduct: (payload) => submit('/products', payload, 'Product saved.'),
+    updateProduct: (payload) => submit('/products/update', payload, 'Product updated.'),
+    createCategory: (payload) => submit('/categories', payload, 'Category saved.'),
+    updateCategory: (payload) => submit('/categories/update', payload, 'Category updated.'),
+    createCustomer: (payload) => submit('/customers', payload, 'Customer saved.'),
+    updateCustomer: (payload) => submit('/customers/update', payload, 'Customer updated.'),
+    createUser: (payload) => submit('/users', payload, 'Staff saved.'),
+    updateUser: (payload) => submit('/users/update', payload, 'Staff updated.'),
+    createBranch: (payload) => submit('/branches', payload, 'Branch saved.'),
+    updateBranch: (payload) => submit('/branches/update', payload, 'Branch updated.'),
+    adjustStock: (payload) => submit('/stock', payload, 'Stock adjusted.'),
+    deactivateCustomer: (payload) => submit('/customers/deactivate', payload, 'Customer deactivated.'),
     exportCustomers
   };
 }

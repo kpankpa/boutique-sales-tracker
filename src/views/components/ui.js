@@ -1,3 +1,7 @@
+'use client';
+
+import { useEffect } from 'react';
+
 export function Button({ children, variant = 'primary', className = '', ...props }) {
   return (
     <button className={`btn btn-${variant} ${className}`} {...props}>
@@ -57,7 +61,7 @@ export function DataTable({ columns, rows, empty = 'Nothing to show yet.' }) {
         <thead>
           <tr>
             {columns.map((column) => (
-              <th key={column.key}>{column.label}</th>
+              <th key={column.key} scope="col">{column.label}</th>
             ))}
           </tr>
         </thead>
@@ -85,12 +89,20 @@ export function EmptyState({ title, message }) {
 }
 
 export function Modal({ title, onClose, children }) {
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
       <div className="modal" role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()}>
         <header className="modal-head">
           <h2>{title}</h2>
-          <Button variant="ghost" onClick={onClose} aria-label="Close">
+          <Button variant="ghost" onClick={onClose} aria-label="Close dialog">
             ×
           </Button>
         </header>
