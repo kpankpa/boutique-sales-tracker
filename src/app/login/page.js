@@ -1,5 +1,5 @@
-import LoginView from '../../views/LoginView';
+import { permanentRedirect } from 'next/navigation';
 
 export default function LoginPage() {
-  return <LoginView />;
+  permanentRedirect('/staff');
 }

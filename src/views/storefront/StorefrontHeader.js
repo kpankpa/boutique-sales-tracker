@@ -3,7 +3,7 @@
 import { useStorefront } from './StorefrontProvider';
 
 export default function StorefrontHeader() {
-  const { cartCount, wishlist } = useStorefront();
+  const { wishlist } = useStorefront();
 
   return (
     <header className="shop-topbar">
@@ -16,10 +16,6 @@ export default function StorefrontHeader() {
         <a href="/shop/wishlist">
           Wishlist{wishlist.length > 0 ? <span className="shop-count">{wishlist.length}</span> : null}
         </a>
-        <a href="/shop/cart" className="shop-bag">
-          Bag{cartCount > 0 ? <span className="shop-count">{cartCount}</span> : null}
-        </a>
-        <a href="/login" className="shop-staff-link">Staff</a>
       </nav>
     </header>
   );

@@ -53,7 +53,7 @@
 
 ### Must-have features
 - Database schema creation and migration marker.
-- `/install` wizard: environment check, database prepare, company/branch setup, admin account, optional demo data, finish.
+- `/staff/install` wizard: environment check, database prepare, company/branch setup, admin account, optional demo data, finish.
 - Installer locks itself after completion.
 - Authentication: admin password, cashier PIN or password, locked sessions, sign out.
 - Roles: `admin`, `cashier`.
@@ -215,7 +215,7 @@
 1. Create the Neon/PostgreSQL database and connect it to Vercel.
 2. Set `DATABASE_URL`, `SESSION_SECRET` and S3-compatible image storage variables.
 3. Keep local development on `file:data/pos.db`; use `npm run migrate:neon` only when intentionally replacing hosted data.
-4. Run `/install` in production.
+4. Run `/staff/install` in production.
 5. Smoke test: install, login, create product, record sale, view report.
 6. Point a custom domain and confirm HTTPS.
 
@@ -352,6 +352,7 @@
 - Direct **Order on WhatsApp** action on every available card, carrying that exact size/SKU.
 - Availability badge; sold-out pairs cannot be added.
 - Persistent wishlist across routes and reloads.
+- Public nav shows only Shop and Wishlist; staff tools live under `/staff` with no shop entry point.
 
 ### Recommended features
 - Hero banner with Sneakwise streetwear styling.

@@ -1,5 +1,5 @@
-import PosView from '../../views/PosView';
+import { permanentRedirect } from 'next/navigation';
 
 export default function PosPage() {
-  return <PosView />;
+  permanentRedirect('/staff/pos');
 }

@@ -1,5 +1,5 @@
-import AdminView from '../../views/AdminView';
+import { permanentRedirect } from 'next/navigation';
 
 export default function AdminPage() {
-  return <AdminView />;
+  permanentRedirect('/staff/admin');
 }

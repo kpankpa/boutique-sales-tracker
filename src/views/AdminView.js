@@ -71,8 +71,8 @@ export default function AdminView() {
   }, [admin.tab]);
 
   useEffect(() => {
-    if (!loading && !user) router.replace('/login');
-    else if (!loading && user && user.role !== 'admin') router.replace('/pos');
+    if (!loading && !user) router.replace('/staff');
+    else if (!loading && user && user.role !== 'admin') router.replace('/staff/pos');
   }, [loading, user, router]);
 
   useEffect(() => {
@@ -333,7 +333,7 @@ export default function AdminView() {
       user={user}
       onSignOut={signOut}
       sessionExpiring={sessionExpiring}
-      links={[{ href: '/pos', label: 'POS' }, { href: '/admin', label: 'Admin' }]}
+      links={[{ href: '/staff/pos', label: 'POS' }, { href: '/staff/admin', label: 'Admin' }]}
     >
       <div className="page-head">
         <div className="row-between">

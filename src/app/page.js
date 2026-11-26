@@ -10,10 +10,10 @@ export default function Home() {
   useEffect(() => {
     apiGet('/status')
       .then((status) => {
-        if (!status.installed) return router.replace('/install');
+        if (!status.installed) return router.replace('/staff/install');
         return router.replace('/shop');
       })
-      .catch(() => router.replace('/install'));
+      .catch(() => router.replace('/staff/install'));
   }, [router]);
 
   return <div className="center-screen"><p>Opening Sneakwise…</p></div>;

@@ -17,7 +17,7 @@ export default function LoginView() {
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace(user.role === 'admin' ? '/admin' : '/pos');
+      router.replace(user.role === 'admin' ? '/staff/admin' : '/staff/pos');
     }
   }, [loading, user, router]);
 
@@ -29,7 +29,7 @@ export default function LoginView() {
       usePin ? { username, pin } : { username, password }
     );
     if (signedIn) {
-      router.replace(signedIn.role === 'admin' ? '/admin' : '/pos');
+      router.replace(signedIn.role === 'admin' ? '/staff/admin' : '/staff/pos');
     }
     setBusy(false);
   };

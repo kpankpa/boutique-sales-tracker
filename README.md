@@ -6,7 +6,7 @@ Till, stock and customer tracker for **Sneakwise**, a sneaker boutique in Ghana.
 
 Phases 1–4 and 6–7 of `DEVELOPMENT_PLAN.md` are implemented and deployed. Phases 10–12 add the public storefront:
 
-- Browser installer at `/install`
+- Browser installer at `/staff/install`
 - Admin and cashier authentication with role and branch scoping
 - Product catalogue with sneaker categories and EU sizes (sneakers, slides & sandals, apparel, bottoms, accessories)
 - Fast sale entry with size selection per pair/style
@@ -63,13 +63,13 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open `http://localhost:3000`. The app redirects to `/install`. After installation it opens the public storefront at `/shop`. Staff sign in at `/login` and land on `/pos` or `/admin`.
+Open `http://localhost:3000`. The app redirects to `/staff/install`. After installation it opens the public storefront at `/shop`. Staff sign in at `/staff` and land on `/staff/pos` or `/staff/admin`. The old `/install`, `/login`, `/pos` and `/admin` URLs redirect to the staff area.
 
 Development defaults to `DATABASE_URL=file:data/pos.db`. The `data` folder is created automatically.
 
 ## First-time setup
 
-1. Open `/install`.
+1. Open `/staff/install`.
 2. Prepare the database.
 3. Enter company name and one or more branches.
 4. Create the admin account.
@@ -235,7 +235,7 @@ Stop the app, copy the backup over `data/pos.db`, start the app, sign in and con
 1. Create a Neon PostgreSQL project and copy the pooled connection string (`…-pooler.…neon.tech/neondb?sslmode=require`).
 2. Create a Vercel project from this repository.
 3. Add `DATABASE_URL` (the Neon string) and a long random `SESSION_SECRET`. For product photos also add `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `S3_BUCKET=sales-bin` (plus optional `S3_PUBLIC_BASE_URL`). Optionally add `LOGIN_MAX_ATTEMPTS` and `AUDIT_RETENTION_DAYS`. No `DATABASE_AUTH_TOKEN` is needed for Neon.
-4. Deploy and open `/install`.
+4. Deploy and open `/staff/install`.
 5. Smoke test: install → sign in → add product → record sale → view daily summary.
 6. Use Neon's dashboard restore for recovery; schedule `npm run prune:audit` from a machine or CI job that has the same database variables.
 

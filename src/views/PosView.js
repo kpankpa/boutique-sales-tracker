@@ -150,7 +150,7 @@ export default function PosView() {
   }, [productGroups, productSearch, favorites, recent]);
 
   useEffect(() => {
-    if (!loading && !user) router.replace('/login');
+    if (!loading && !user) router.replace('/staff');
   }, [loading, user, router]);
 
   if (loading || !user) return <div className="center-screen"><p>Loading…</p></div>;
@@ -271,8 +271,8 @@ export default function PosView() {
       onSignOut={signOut}
       sessionExpiring={sessionExpiring}
       links={[
-        { href: '/pos', label: 'POS' },
-        ...(user.role === 'admin' ? [{ href: '/admin', label: 'Admin' }] : [])
+        { href: '/staff/pos', label: 'POS' },
+        ...(user.role === 'admin' ? [{ href: '/staff/admin', label: 'Admin' }] : [])
       ]}
     >
       {pos.offline && <div className="alert alert-warn">You are offline. Sales will be queued on this device.</div>}
@@ -536,7 +536,7 @@ export default function PosView() {
                         />
                         <Button type="submit" variant="secondary">Add stock</Button>
                         {user.role === 'admin' && (
-                          <a className="btn btn-ghost" href={`/admin?${stockParams.toString()}`}>Stock screen</a>
+                          <a className="btn btn-ghost" href={`/staff/admin?${stockParams.toString()}`}>Stock screen</a>
                         )}
                       </div>
                     </form>

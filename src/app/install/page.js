@@ -1,5 +1,5 @@
-import InstallWizard from '../../views/InstallWizard';
+import { permanentRedirect } from 'next/navigation';
 
 export default function InstallPage() {
-  return <InstallWizard />;
+  permanentRedirect('/staff/install');
 }

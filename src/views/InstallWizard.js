@@ -16,7 +16,7 @@ export default function InstallWizard() {
       <div className="center-screen">
         <Card title="Already installed" subtitle="This application has been set up.">
           <p className="muted">Sign in to continue.</p>
-          <a className="btn btn-primary" href="/login">Go to sign in</a>
+          <a className="btn btn-primary" href="/staff">Go to sign in</a>
         </Card>
       </div>
     );
@@ -135,7 +135,7 @@ export default function InstallWizard() {
                   disabled={busy}
                   onClick={async () => {
                     const done = await installer.finish();
-                    if (done) router.replace('/login');
+                    if (done) router.replace('/staff');
                   }}
                 >
                   {busy ? 'Installing…' : 'Finish installation'}
