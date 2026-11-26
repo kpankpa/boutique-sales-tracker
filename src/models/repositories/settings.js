@@ -19,7 +19,10 @@ export async function setSetting(key, value) {
 export async function isInstalled() {
   try {
     return (await getSetting('installed')) === '1';
-  } catch {
-    return false;
+  } catch (failure) {
+    // A database outage is not an uninstalled application. Callers have
+    // already ensured the schema, so surface the real infrastructure error.
+    console.error('[settings] Could not read install state', failure);
+    throw failure;
   }
 }

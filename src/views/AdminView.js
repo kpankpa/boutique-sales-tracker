@@ -52,6 +52,7 @@ export default function AdminView() {
   const [editingUserId, setEditingUserId] = useState(null);
   const [branch, setBranch] = useState(blankBranch);
   const [stockAdjustment, setStockAdjustment] = useState(blankStock);
+  const [shopForm, setShopForm] = useState({ companyName: '', whatsappNumber: '' });
   const [stockBranchId, setStockBranchId] = useState('');
   const [stockFormError, setStockFormError] = useState('');
   const [search, setSearch] = useState('');
@@ -73,6 +74,15 @@ export default function AdminView() {
     if (!loading && !user) router.replace('/login');
     else if (!loading && user && user.role !== 'admin') router.replace('/pos');
   }, [loading, user, router]);
+
+  useEffect(() => {
+    if (admin.shopSettings.companyName) {
+      setShopForm({
+        companyName: admin.shopSettings.companyName,
+        whatsappNumber: admin.shopSettings.whatsappNumber || ''
+      });
+    }
+  }, [admin.shopSettings]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1102,6 +1112,52 @@ export default function AdminView() {
               rows={filteredAudit}
               empty={q ? 'No audit entries match your search.' : 'No activity yet.'}
             />
+          </Card>
+        </div>
+      )}
+
+      {admin.tab === 'Shop settings' && (
+        <div className="stack">
+          <Card title="Storefront" subtitle="Public shop details shown at checkout.">
+            <form
+              className="form-grid"
+              onSubmit={(event) => {
+                event.preventDefault();
+                admin.updateShopSettings(shopForm);
+              }}
+            >
+              <Field label="Company name" hint="Used on the shop and receipts.">
+                <Input
+                  value={shopForm.companyName}
+                  onChange={(event) => setShopForm((current) => ({ ...current, companyName: event.target.value }))}
+                  maxLength={80}
+                  required
+                />
+              </Field>
+              <Field
+                label="WhatsApp number"
+                hint="Include the country code. A Ghana 0… number is converted to 233… automatically."
+              >
+                <Input
+                  type="tel"
+                  value={shopForm.whatsappNumber}
+                  onChange={(event) => setShopForm((current) => ({ ...current, whatsappNumber: event.target.value }))}
+                  placeholder="024 123 4567 or +233 24 123 4567"
+                  maxLength={30}
+                />
+              </Field>
+              <div className="row-between">
+                <Button type="submit">Save shop settings</Button>
+                <a href="/shop" target="_blank" rel="noopener noreferrer">Open the storefront ↗</a>
+              </div>
+            </form>
+          </Card>
+          <Card title="Checkout handoff" subtitle="How customer orders reach the shop.">
+            <p className="muted">
+              Customers build a bag on the public storefront, then tap “Send order on WhatsApp”.
+              The message carries every item, size, quantity, price and the total. No sale is created
+              until staff confirm payment and record it in the POS.
+            </p>
           </Card>
         </div>
       )}

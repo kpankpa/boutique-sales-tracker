@@ -114,6 +114,9 @@ if (isPostgres) {
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 15000
   });
+  // Pooled clients can be reset by Neon between requests. Without a listener
+  // that idle-client error becomes an uncaught exception and kills the server.
+  pool.on('error', (error) => console.error('[database] idle PostgreSQL client error', error));
   database = makePgExecutor(pool, pool);
 } else {
   database = createClient({ url: databaseUrl, authToken });

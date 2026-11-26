@@ -1,5 +1,5 @@
-const cacheName = 'sneakwise-pos-v1';
-const shell = ['/', '/manifest.json', '/icon.svg'];
+const cacheName = 'sneakwise-pos-v2';
+const shell = ['/', '/shop', '/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(cacheName).then((cache) => cache.addAll(shell)));

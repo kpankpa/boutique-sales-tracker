@@ -1,10 +1,10 @@
 # Development Plan — Sneakwise POS
 
-**Scope:** One company, multiple branches. Web application, browser installer, lightweight POS, authentication, small CRM. Notifications are deferred but designed for.
+**Scope:** One company, multiple branches. Browser installer, lightweight POS, authentication, small CRM, owner reporting, and a public Sneakwise storefront with cart, wishlist and WhatsApp checkout handoff. Owner notifications remain deferred but designed for.
 
 **Architecture:** MVVM (Model–View–ViewModel) on Next.js App Router.
 
-**Last updated:** 23 November 2026
+**Last updated:** 26 November 2026
 
 ---
 
@@ -17,11 +17,15 @@
 | 2 | Core POS | Product catalogue, sale entry, offline queue, stock decrement, receipts | Done |
 | 3 | Small CRM | Customers, purchase history, credit, consent records | Done |
 | 4 | Admin & reporting | Daily summary, branch filters, audit log, notification outbox | Done |
-| 5 | Notifications (deferred) | WhatsApp/SMS delivery worker reading the outbox | Deferred by owner |
+| 5 | Notifications (deferred) | Owner WhatsApp/SMS delivery worker reading the outbox | Deferred by owner — customer checkout handoff is Phase 10–12 |
 | 6 | Hardening | Backups, security review, DPC compliance, error handling | Done |
-| 7 | Deployment | Vercel + hosted libSQL, environment config, smoke tests | Next |
-| 8 | Pilot & iteration | Staff training, 2-week pilot, KPI review | Planned |
-| 9 | Scale (optional) | Barcode labels, GRA E-VAT, advanced stock, resale platform | Optional |
+| 7 | Deployment | Vercel + Neon/PostgreSQL, environment config, smoke tests | Done |
+| 8 | Pilot & iteration | Staff training, 2-week pilot, KPI review | In progress — pending storefront pilot |
+| 9 | Scale (optional) | Purchase orders, stock counts, GRA E-VAT, multi-company tenancy | Partial — barcode/QR done; rest later |
+| 10 | Storefront foundations | Public catalogue API, safe product projection, shop settings | Done |
+| 11 | Storefront browsing | Product grid, filters, product cards, wishlist | Done |
+| 12 | Cart & WhatsApp checkout | Persistent cart, structured order message, wa.me handoff | Done |
+| 13 | Storefront hardening & pilot | Mobile QA, stale-price guard, analytics, owner training | In progress — real-device QA and pilot pending |
 
 ---
 
@@ -205,31 +209,36 @@
 
 ## 9. Phase 7 — Deployment
 
-**Goal:** Run on Vercel with a hosted libSQL database.
+**Goal:** Run on Vercel with a hosted PostgreSQL database.
 
 ### Steps
-1. Create a Turso/libSQL database.
-2. Create a Vercel project and connect the repository.
-3. Set `DATABASE_URL`, `DATABASE_AUTH_TOKEN`, `SESSION_SECRET`.
+1. Create the Neon/PostgreSQL database and connect it to Vercel.
+2. Set `DATABASE_URL`, `SESSION_SECRET` and S3-compatible image storage variables.
+3. Keep local development on `file:data/pos.db`; use `npm run migrate:neon` only when intentionally replacing hosted data.
 4. Run `/install` in production.
 5. Smoke test: install, login, create product, record sale, view report.
 6. Point a custom domain and confirm HTTPS.
 
 ### Recommended features
-- `vercel.json` with security headers.
 - Separate production and staging databases.
 - Status endpoint for monitoring.
+- PostgreSQL-safe SQL: every multi-table `GROUP BY` must include all non-aggregated selected columns.
+
+**Exit criteria:** The production Admin dashboard, POS, reports and receipts load without 500 errors. Done on Neon.
 
 ---
 
 ## 10. Phase 8 — Pilot & iteration
 
+**Status:** In progress. Internal POS hardening is complete; live staff pilot and storefront pilot are still pending.
+
 **Goal:** Prove value in a real boutique.
 
 ### Activities
-- Train 2–5 staff.
+- Train 2–5 staff on POS, stock edits, barcode/QR scanning and transaction references.
 - Run for two weeks.
 - Compare baseline and post-pilot figures.
+- Add the public storefront to the pilot only after Phase 13 checks pass.
 
 ### KPIs
 - 98% of sales entered within two minutes.
@@ -241,15 +250,161 @@
 
 ## 11. Phase 9 — Scale (optional)
 
-- Barcode and QR labels.
-- Purchase orders and suppliers.
-- Advanced stock counts.
-- GRA E-VAT integration if VAT-registered.
-- Multi-company tenancy if selling to other boutiques.
+**Status:** Partial. Barcode/QR labels and smart scan-to-fill are done; the remaining items are parked until after the storefront pilot.
+
+- **Done:** manufacturer barcodes, `SW1:` smart QR labels with legacy `SLAWN1:` decoding, scan-to-fill.
+- **Later:** purchase orders and suppliers.
+- **Later:** stock counts and cycle-count workflow beyond quick adjustments.
+- **Later:** GRA E-VAT integration if VAT-registered.
+- **Later:** multi-company tenancy if selling to other boutiques.
 
 ---
 
-## 12. Feature priority key
+## 11A. Storefront business analysis
+
+**Goal:** Let a walk-in or social-media customer browse Sneakwise sneakers, save favourites, build a bag, and send a complete order request to the boutique's WhatsApp without creating an account.
+
+**Stakeholders**
+- **Shopper:** wants to see models, available sizes, prices and photos on a phone; wants to ask about an item quickly.
+- **Owner/staff:** wants the exact items, sizes, quantities and total in one WhatsApp message; confirms payment and records the sale in the POS.
+- **Developer/operator:** needs safe public data, configurable WhatsApp destination, and no accidental stock or sales side effects.
+
+**Business rules**
+1. Only active products appear in the storefront.
+2. Cost price, branch names, staff data, customers and audit records never leave the public API.
+3. Stock shown is a summed availability signal across branches, not a reservation.
+4. Checkout creates **no sale, customer, payment or stock movement**. It opens WhatsApp with a structured enquiry/order. Staff confirms availability and payment, then records the sale in the POS.
+5. Prices in the WhatsApp message are re-read from the server at checkout time, so an old browser tab cannot quote an edited price.
+6. The WhatsApp number is configured by the owner in Admin → Shop settings, with an environment fallback for deployment.
+7. If no number is configured, checkout offers a copyable order text and a clear setup message instead of a broken link.
+
+**Non-goals for this phase**
+- Online payment, delivery tracking, discounts, account login, user reviews and automated owner alerts.
+- Creating a CRM customer from a storefront contact form without consent.
+
+**Risks and mitigations**
+| Risk | Mitigation |
+|---|---|
+| Customer sees a pair that sold out elsewhere | Availability is labelled "subject to confirmation"; staff confirms before POS sale |
+| Stale tab quotes old price | Checkout rebuilds the message from the public catalogue API |
+| Public API leaks internal data | Dedicated safe projection; never reuse `/api/products` response |
+| WhatsApp number not configured | Admin setting + env fallback + copy-text fallback |
+| Accidental POS double-counting | WhatsApp handoff never writes sale/stock tables |
+| Long message breaks deep link | Compact line format, capped note length and item count |
+
+---
+
+## 11B. Senior engineer design
+
+**Routes**
+- `/shop` — catalogue, search, category and size filters, add-to-bag, wishlist toggle.
+- `/shop/cart` — quantities, removals, subtotal, checkout entry.
+- `/shop/wishlist` — saved models with add-to-bag action.
+- `/shop/checkout` — customer name, phone, payment preference, note, order preview and WhatsApp handoff.
+
+**Model / service**
+- `listPublicProducts()` returns only customer-safe fields.
+- `listStockTotals()` sums stock by product, both SQLite and PostgreSQL safe.
+- `getShopCatalog()` combines settings, active categories and products into one public response.
+- `getShopSettings()` / `updateShopSettings()` own validation and the audit entry.
+- `wa.me` URL building happens at the edge (viewmodel), using only data returned by the public API.
+
+**Client state**
+- Cart and wishlist are client-only, stored in `localStorage` under `sneakwise.shop.*` keys.
+- Storage reads are validated and corrupt values are discarded instead of crashing the app.
+- A shop context provider shares catalogue, bag and wishlist state across `/shop/*` routes.
+
+**Acceptance criteria**
+- A visitor can browse, filter, save, add to bag, edit quantities and reach checkout without signing in.
+- The WhatsApp text includes every chosen item, size, quantity, unit price, line total and grand total.
+- No public endpoint returns `cost`, `barcode`, branch details or inactive products.
+- Build and smoke checks pass on SQLite and Neon.
+
+---
+
+## 12. Phase 10 — Storefront foundations
+
+**Goal:** Expose a safe catalogue and let the owner control the WhatsApp destination.
+
+### Must-have features
+- Public `GET /api/shop/catalog` requiring installation but no login.
+- Active products only; no `cost`, `barcode`, branch or staff fields.
+- Availability derived from summed stock; inactive products hidden.
+- Admin `GET/POST /api/settings` for company name and WhatsApp number.
+- Ghana-friendly number normalisation to international `233…` format.
+- Audit entry when shop settings change.
+
+### Exit criteria
+- Anonymous request returns a usable catalogue.
+- An edited price is reflected in the next anonymous request.
+- Invalid or empty WhatsApp configuration cannot produce a broken deep link.
+
+---
+
+## 13. Phase 11 — Storefront browsing
+
+**Goal:** A shopper can find a pair on a phone.
+
+### Must-have features
+- `/shop` product grid using existing `image_url` photos or a clean placeholder.
+- Search by name/SKU, category filter and size filter.
+- Add-to-bag and wishlist actions on every card.
+- Availability badge; sold-out pairs cannot be added.
+- Persistent wishlist across routes and reloads.
+
+### Recommended features
+- Hero banner with Sneakwise streetwear styling.
+- Result count and empty state.
+- Sort by newest/name/price.
+
+### Exit criteria
+- Shopper can reach a specific size in two taps on a 375px-wide screen.
+
+---
+
+## 14. Phase 12 — Cart and WhatsApp checkout
+
+**Goal:** The chosen items become one complete WhatsApp order request.
+
+### Must-have features
+- `/shop/cart` with quantity steppers, line totals, subtotal and empty state.
+- `/shop/checkout` with required name and phone, optional payment preference and note.
+- Server catalogue revalidation before building the message.
+- Structured WhatsApp text with SKU, name, size, quantity, unit price, line total and grand total.
+- `https://wa.me/<number>?text=…` deep link, plus copy-text fallback.
+- Cart is not cleared automatically; shopper clears it after confirming the send.
+
+### Exit criteria
+- The generated message contains every selected item and the correct total.
+- No sale, customer or stock record is created by checkout.
+
+---
+
+## 15. Phase 13 — Storefront hardening and pilot
+
+**Goal:** Make the public flow safe for real customers.
+
+### Must-have features
+- Mobile QA on real Android and iOS devices.
+- Verify stock and price changes appear within one fresh page load.
+- Database connection failures must surface as infrastructure errors, never as "not installed".
+- Idle PostgreSQL pool client errors are logged, not allowed to crash the server.
+- Verify no public API field leaks internal pricing or staff data.
+- Owner training: reading WhatsApp orders, confirming payment, recording the POS sale.
+- Vercel environment fallback for the WhatsApp number.
+
+### Recommended features
+- Lightweight storefront visit/order-start counters.
+- Saved delivery notes for repeat customers, only with explicit consent.
+- Product badge for "just landed".
+
+### Exit criteria
+- Two staff members can run an end-to-end order without developer help.
+- The owner receives one readable order with all items before stock is reserved.
+
+---
+
+## 16. Feature priority key
 
 - **Must:** required for the phase to be accepted.
 - **Recommended:** adds clear value with low risk; include if time allows.
@@ -257,7 +412,7 @@
 
 ---
 
-## 13. coding standards
+## 17. Coding standards
 
 - Use MVVM boundaries: models never import React; views contain no SQL.
 - Keep functions under roughly 40 lines; extract when they grow.

@@ -1,10 +1,10 @@
 # Sneakwise POS
 
-Till, stock and customer tracker for **Sneakwise**, a sneaker boutique in Ghana. It covers the browser installer, staff authentication, a fast point-of-sale screen, a small CRM, and owner reporting. WhatsApp/SMS notifications are intentionally deferred; the database already records events in `notification_outbox` for a future delivery worker.
+Till, stock and customer tracker for **Sneakwise**, a sneaker boutique in Ghana. It covers the browser installer, staff authentication, a fast point-of-sale screen, a small CRM, owner reporting, and a public storefront with cart, wishlist and WhatsApp checkout. Owner WhatsApp/SMS alerts are intentionally deferred; the database already records events in `notification_outbox` for a future delivery worker.
 
 ## Current phase
 
-Phase 1–4 of `DEVELOPMENT_PLAN.md` are implemented as a working prototype:
+Phases 1–4 and 6–7 of `DEVELOPMENT_PLAN.md` are implemented and deployed. Phases 10–12 add the public storefront:
 
 - Browser installer at `/install`
 - Admin and cashier authentication with role and branch scoping
@@ -15,8 +15,11 @@ Phase 1–4 of `DEVELOPMENT_PLAN.md` are implemented as a working prototype:
 - Stock tracking per branch and size, with opening stock, adjustments and reorder alerts
 - Customer records with consent timestamp and credit fields
 - Daily branch summary, low stock, audit log and notification outbox
+- Public storefront at `/shop` with filters, product cards, wishlist and cart
+- Checkout that builds a structured WhatsApp order with items, sizes, quantities, prices and total
+- Admin → Shop settings for the WhatsApp destination and company name
 
-Notification delivery and GRA E-VAT are not implemented yet.
+Checkout is a WhatsApp handoff only: it does not create a sale, customer or stock movement. Staff confirm payment and record the sale in the POS. Owner notifications and GRA E-VAT are not implemented yet.
 
 ## Stack
 
@@ -39,8 +42,10 @@ src/
     services/          Business rules (installer, auth, sales, admin, reports)
   viewmodels/          Client hooks: useSession, useInstaller, usePos, useAdmin
     offline/           Dexie outbox: durable queue and sync state transitions
+    storefront/        Cart/wishlist storage and WhatsApp message builder
   views/               Presentational components and screens
     components/        Reusable UI kit
+    storefront/        Public shop provider, header and product cards
 ```
 
 Rules:
@@ -58,7 +63,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open `http://localhost:3000`. The app redirects to `/install`. After installation it redirects to `/login`.
+Open `http://localhost:3000`. The app redirects to `/install`. After installation it opens the public storefront at `/shop`. Staff sign in at `/login` and land on `/pos` or `/admin`.
 
 Development defaults to `DATABASE_URL=file:data/pos.db`. The `data` folder is created automatically.
 
@@ -98,6 +103,29 @@ Products have a `category` and optional `size`. Categories include preset sizes:
 - **Accessories / Other**: no size, or custom.
 
 In Admin → Products, pick a category, enter a style code, select sizes, and save once. The app creates one SKU per size (`STYLE-SIZE`), tracks stock per branch and size, and the POS prompts for size when selling. Opening stock is applied per size.
+
+## Public storefront and WhatsApp checkout
+
+The storefront lives at `/shop`. It reads `GET /api/shop/catalog`, a public but deliberately narrow projection: active products, safe images, prices, category labels and summed availability across active branches. Cost price, barcodes, branch names, staff and customer data are never returned.
+
+Visitors can search, filter by category and size, save favourites, build a bag, and open `/shop/checkout`. Checkout re-reads the catalogue, then builds a message like:
+
+```text
+*NEW ORDER — Sneakwise*
+
+*Customer:* Kwame Mensah
+*Phone:* 0241234567
+*Payment preference:* Pay on delivery
+
+*Items:*
+1. Navy low-top sneakers — EU size: 41 — SN-NVY-41
+   2 × GH₵ 320.00 = GH₵ 640.00
+
+*TOTAL: GH₵ 640.00*
+Please confirm availability and delivery details. Thank you!
+```
+
+Set the destination number in **Admin → Shop settings**. Ghana numbers entered as `024…` are converted to `23324…`. `STORE_WHATSAPP_NUMBER` in the environment is a deployment fallback. If no number is configured, checkout offers a copyable order message instead of a broken link. The cart is not cleared automatically; the shopper clears it after sending the WhatsApp message.
 
 ## Barcode and QR scanning
 
@@ -222,6 +250,9 @@ Stop the app, copy the backup over `data/pos.db`, start the app, sign in and con
 | POST | `/api/auth/login` | Password or PIN sign-in |
 | POST | `/api/auth/logout` | End session |
 | GET | `/api/auth/me` | Current user |
+| GET | `/api/shop/catalog` | Public storefront catalogue and shop config |
+| GET | `/api/settings` | Shop settings (admin) |
+| POST | `/api/settings/update` | Update company name/WhatsApp number (admin) |
 | GET | `/api/meta` | Branches visible to the user |
 | GET/POST | `/api/products` | Catalogue; POST accepts `category`, `size` or `sizes[]` + `baseSku` for variants, and optional `barcode` |
 | GET | `/api/lookup?code=` | Resolve a scanned barcode or SKU to a product |

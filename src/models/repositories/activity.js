@@ -34,6 +34,22 @@ export async function listStock({ limit = 200, branchId = null } = {}) {
   return result.rows;
 }
 
+// Storefront availability is a summed signal, not a reservation. Grouping by
+// only the aggregated key keeps this valid on both SQLite and PostgreSQL.
+export async function listStockTotals() {
+  const result = await database.execute(
+    `SELECT s.product_id, SUM(s.qty) AS units
+     FROM stock s
+     JOIN branches b ON b.id = s.branch_id
+     WHERE b.active = 1
+     GROUP BY s.product_id`
+  );
+  return result.rows.map((row) => ({
+    productId: Number(row.product_id),
+    units: Math.max(0, Number(row.units) || 0)
+  }));
+}
+
 export async function listLowStock(limit = 20) {
   const result = await database.execute({
     sql: `SELECT b.name AS branch_name, p.sku, p.name, p.category, p.size, s.qty, s.low_at

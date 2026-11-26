@@ -11,7 +11,8 @@ export const adminTabs = [
   'Sales',
   'Staff',
   'Branches',
-  'Outbox'
+  'Outbox',
+  'Shop settings'
 ];
 
 export function useAdmin() {
@@ -27,6 +28,7 @@ export function useAdmin() {
   const [branches, setBranches] = useState([]);
   const [outbox, setOutbox] = useState([]);
   const [audit, setAudit] = useState([]);
+  const [shopSettings, setShopSettings] = useState({ companyName: '', whatsappNumber: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -95,6 +97,9 @@ export function useAdmin() {
           setAudit(log);
           break;
         }
+        case 'Shop settings':
+          setShopSettings(await apiGet('/settings'));
+          break;
         default:
           break;
       }
@@ -147,6 +152,7 @@ export function useAdmin() {
     branches,
     outbox,
     audit,
+    shopSettings,
     loading,
     error,
     message,
@@ -162,6 +168,7 @@ export function useAdmin() {
     updateBranch: (payload) => submit('/branches/update', payload, 'Branch updated.'),
     adjustStock: (payload) => submit('/stock', payload, 'Stock adjusted.'),
     deactivateCustomer: (payload) => submit('/customers/deactivate', payload, 'Customer deactivated.'),
+    updateShopSettings: (payload) => submit('/settings/update', payload, 'Shop settings saved.'),
     exportCustomers
   };
 }

@@ -11,6 +11,17 @@ export async function listProducts() {
   return result.rows;
 }
 
+// Public storefront projection: no cost, barcode or branch data can escape.
+export async function listPublicProducts() {
+  const result = await database.execute(
+    `SELECT id, sku, name, category, size, image_url, price
+     FROM products
+     WHERE active = 1
+     ORDER BY name ASC, size ASC, sku ASC`
+  );
+  return result.rows;
+}
+
 export async function findProductBySku(sku) {
   const result = await database.execute({
     sql: `SELECT id, sku, name, category, size, barcode, image_url, price, cost

@@ -19,8 +19,9 @@ This guide is the design input for the project. It replaces a formal imported UI
 
 | User | Context | Need |
 |---|---|---|
-| Owner/admin | May be away from the shop; checks on phone | See sales, stock and exceptions quickly |
+| Owner/admin | May be away from the shop; checks on phone | See sales, stock and exceptions quickly; configure shop settings |
 | Cashier | At the counter, customer waiting | Add item, take payment, move on |
+| Shopper | Public visitor on a phone, often from social media | Find a pair, choose a size, send an order without signing in |
 | Manager (future) | Multiple branches | Compare branches and reconcile |
 
 ---
@@ -38,6 +39,11 @@ Open POS → tap product or type SKU → adjust quantity → choose payment → 
 
 ### Owner check
 Open admin → daily summary → branch filter → flagged items → sales list.
+
+### Shopper
+Open `/shop` → filter or search → tap heart to save → add size to bag → edit bag → checkout → enter name/phone → send order on WhatsApp. No account, payment or stock reservation happens in the browser.
+
+Storefront style: dark green streetwear hero, high-contrast product cards, gold category accents, large touch targets, and plain-language availability labels. Availability is always "subject to confirmation" because stock is summed across branches, not reserved.
 
 ---
 

@@ -32,6 +32,7 @@ import { lookupCode } from '../../../models/services/lookupService';
 import { presignProductImage } from '../../../models/services/uploadService';
 import { adjustStockFromInput } from '../../../models/services/stockService';
 import { dailySummary, lowStock } from '../../../models/services/reportService';
+import { getShopCatalog, getShopSettings, updateShopSettings } from '../../../models/services/storeService';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -120,12 +121,27 @@ async function handle(request, context) {
       return ok();
     }
 
+    // Public storefront: safe catalogue projection, no session required.
+    if (key === 'shop/catalog' && method === 'GET') return ok(await getShopCatalog());
+
     const user = await signedInUser();
     if (!user) return fail('Please sign in.', 401);
 
     if (key === 'auth/me' && method === 'GET') {
       const session = await currentSession();
       return ok({ user, expiresAt: session?.expiresAt ?? null });
+    }
+
+    if (key === 'settings' && method === 'GET') {
+      const denied = requireAdmin(user);
+      if (denied) return denied;
+      return ok(await getShopSettings());
+    }
+    if (key === 'settings/update' && method === 'POST') {
+      const denied = requireAdmin(user);
+      if (denied) return denied;
+      const body = await request.json().catch(() => ({}));
+      return ok(await updateShopSettings(user, body));
     }
 
     if (key === 'meta' && method === 'GET') {
