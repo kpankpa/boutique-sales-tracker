@@ -1,10 +1,36 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import { useStorefront } from './StorefrontProvider';
-import { money } from '../../viewmodels/storefront/whatsapp';
+import { buildOrderMessage, buildWhatsappUrl, money } from '../../viewmodels/storefront/whatsapp';
 
 export default function CartView() {
-  const { cart, subtotal, updateQty, removeFromCart } = useStorefront();
+  const { catalog, cart, subtotal, updateQty, removeFromCart } = useStorefront();
+  const [copied, setCopied] = useState(false);
+
+  const orderMessage = useMemo(
+    () => buildOrderMessage({ companyName: catalog.companyName, items: cart }),
+    [catalog.companyName, cart]
+  );
+  const orderUrl = useMemo(
+    () => buildWhatsappUrl(catalog.whatsappNumber, orderMessage),
+    [catalog.whatsappNumber, orderMessage]
+  );
+
+  useEffect(() => {
+    if (!copied) return undefined;
+    const timer = window.setTimeout(() => setCopied(false), 1600);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+
+  const copyOrder = async () => {
+    try {
+      await navigator.clipboard.writeText(orderMessage);
+      setCopied(true);
+    } catch {
+      window.prompt('Copy your order text:', orderMessage);
+    }
+  };
 
   if (cart.length === 0) {
     return (
@@ -81,8 +107,27 @@ export default function CartView() {
           <span>Total</span>
           <strong>{money(subtotal)}</strong>
         </div>
-        <a className="btn btn-primary shop-checkout-link" href="/shop/checkout">Continue to checkout</a>
-        <p className="muted">Stock is not reserved until Sneakwise confirms your order.</p>
+
+        {orderUrl ? (
+          <a
+            className="btn shop-whatsapp shop-checkout-link"
+            href={orderUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Send bag on WhatsApp
+          </a>
+        ) : (
+          <button type="button" className="btn shop-whatsapp shop-checkout-link" onClick={copyOrder}>
+            {copied ? 'Order copied ✓' : 'Copy bag order'}
+          </button>
+        )}
+        <a className="btn btn-secondary shop-checkout-link" href="/shop/checkout">
+          Add delivery details
+        </a>
+        <p className="muted">
+          Stock is not reserved until Sneakwise confirms your order. The message includes every pair and size in your bag.
+        </p>
       </aside>
     </div>
   );

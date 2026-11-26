@@ -349,6 +349,7 @@
 - `/shop` product grid using existing `image_url` photos or a clean placeholder.
 - Search by name/SKU, category filter and size filter.
 - Add-to-bag and wishlist actions on every card.
+- Direct **Order on WhatsApp** action on every available card, carrying that exact size/SKU.
 - Availability badge; sold-out pairs cannot be added.
 - Persistent wishlist across routes and reloads.
 
@@ -368,6 +369,7 @@
 
 ### Must-have features
 - `/shop/cart` with quantity steppers, line totals, subtotal and empty state.
+- **Send bag on WhatsApp** from the cart for the full selection without a form.
 - `/shop/checkout` with required name and phone, optional payment preference and note.
 - Server catalogue revalidation before building the message.
 - Structured WhatsApp text with SKU, name, size, quantity, unit price, line total and grand total.

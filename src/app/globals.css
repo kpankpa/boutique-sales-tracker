@@ -1833,6 +1833,42 @@ a.btn:focus-visible {
   font-size: 12px;
 }
 
+.shop-product-code {
+  color: var(--ink-soft);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.shop-product-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.shop-product-actions .btn {
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.shop-wa {
+  border-color: #128c7e;
+  background: #fff;
+  color: #0e6f64;
+}
+
+.shop-wa:hover:not(:disabled) {
+  background: #eaf7f4;
+  border-color: #0e6f64;
+}
+
+.shop-wa:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .shop-skeleton {
   min-height: 340px;
   background: linear-gradient(90deg, #fff, #f0f4f1, #fff);

@@ -108,7 +108,7 @@ In Admin → Products, pick a category, enter a style code, select sizes, and sa
 
 The storefront lives at `/shop`. It reads `GET /api/shop/catalog`, a public but deliberately narrow projection: active products, safe images, prices, category labels and summed availability across active branches. Cost price, barcodes, branch names, staff and customer data are never returned.
 
-Visitors can search, filter by category and size, save favourites, build a bag, and open `/shop/checkout`. Checkout re-reads the catalogue, then builds a message like:
+Visitors can search, filter by category and size, save favourites, build a bag, and open `/shop/checkout`. For a faster handoff, each product card has **Order on WhatsApp** for that exact size, and the cart has **Send bag on WhatsApp** for the whole selection. The checkout form adds the customer name, phone, payment preference and note. Checkout re-reads the catalogue, then builds a message like:
 
 ```text
 *NEW ORDER — Sneakwise*

@@ -18,12 +18,12 @@ export function cartSubtotal(items) {
 }
 
 export function buildOrderMessage({ companyName, items, customer, payment = '', note = '' }) {
-  const lines = [
-    `*NEW ORDER — ${cleanLine(companyName || 'Sneakwise', 50)}*`,
-    '',
-    `*Customer:* ${cleanLine(customer?.name, MAX_NAME_CHARS)}`,
-    `*Phone:* ${cleanLine(customer?.phone, MAX_PHONE_CHARS)}`
-  ];
+  const lines = [`*NEW ORDER — ${cleanLine(companyName || 'Sneakwise', 50)}*`];
+  if (customer?.name || customer?.phone) {
+    lines.push('');
+    if (customer?.name) lines.push(`*Customer:* ${cleanLine(customer.name, MAX_NAME_CHARS)}`);
+    if (customer?.phone) lines.push(`*Phone:* ${cleanLine(customer.phone, MAX_PHONE_CHARS)}`);
+  }
   if (payment) lines.push(`*Payment preference:* ${cleanLine(payment, 40)}`);
   if (note) lines.push(`*Note:* ${cleanLine(note, MAX_NOTE_CHARS)}`);
 
@@ -37,6 +37,15 @@ export function buildOrderMessage({ companyName, items, customer, payment = '', 
   lines.push('', `*TOTAL: ${money(cartSubtotal(items))}*`);
   lines.push('Please confirm availability and delivery details. Thank you!');
   return lines.join('\n');
+}
+
+// One-tap order from a product card or quick action. The selected size is
+// already embedded in the product row, so no variant lookup is needed here.
+export function buildProductMessage({ companyName, product }) {
+  return buildOrderMessage({
+    companyName,
+    items: [{ ...product, qty: 1 }]
+  });
 }
 
 export function buildWhatsappUrl(number, message) {
