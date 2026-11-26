@@ -413,6 +413,57 @@ export async function createSchema() {
       args: []
     });
   }
+
+  // One-time cleanup of legacy seeded catalogue noise. Sneaker pairs stay;
+  // dresses, bags, belts, old sandals and QA items leave with their stock and
+  // sale lines. The flag stops this from touching later owner-created data.
+  const legacyFlag = await database.execute({
+    sql: "SELECT value FROM settings WHERE key = 'non_footwear_seed_removed'",
+    args: []
+  });
+  if (!legacyFlag.rows[0]) {
+    const legacyProducts = `
+      category IN ('clothing', 'trousers', 'accessories')
+      OR category LIKE 'bags-%'
+      OR sku LIKE 'DS-%'
+      OR sku LIKE 'BAG-%'
+      OR sku LIKE 'SCAN-%'
+      OR sku LIKE 'TXREF-%'
+      OR sku LIKE 'TEST-%'
+      OR sku LIKE 'IMG-%'
+      OR sku LIKE 'IMGD-%'
+      OR sku LIKE 'HB-%'
+      OR sku LIKE 'SC-%'
+      OR sku LIKE 'SH-%'
+      OR LOWER(name) LIKE '%dress%'
+      OR LOWER(name) LIKE '%shirt%'
+      OR LOWER(name) LIKE '%belt%'
+      OR LOWER(name) LIKE '%bag%'
+      OR LOWER(name) LIKE '%sandal%'
+    `;
+    await database.execute(
+      `DELETE FROM sale_lines WHERE product_id IN (SELECT id FROM products WHERE ${legacyProducts})`
+    );
+    await database.execute(
+      `DELETE FROM stock WHERE product_id IN (SELECT id FROM products WHERE ${legacyProducts})`
+    );
+    await database.execute(
+      `DELETE FROM shop_events WHERE product_id IN (SELECT id FROM products WHERE ${legacyProducts})`
+    );
+    await database.execute(`DELETE FROM products WHERE ${legacyProducts}`);
+    await database.execute(`DELETE FROM categories
+      WHERE id IN ('clothing', 'trousers', 'accessories')
+         OR id LIKE 'bags-%'
+         OR LOWER(name) LIKE '%apparel%'
+         OR LOWER(name) LIKE '%bottom%'
+         OR LOWER(name) LIKE '%accessor%'
+         OR LOWER(name) LIKE '%bag%'`);
+    await database.execute({
+      sql: `INSERT INTO settings (key, value) VALUES ('non_footwear_seed_removed', '1')
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      args: []
+    });
+  }
 }
 
 let schemaReady;

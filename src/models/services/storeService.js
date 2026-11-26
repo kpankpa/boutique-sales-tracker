@@ -41,12 +41,14 @@ const SIZE_GUIDE = {
   ]
 };
 
-// The public shop is a sneaker boutique. Legacy apparel/accessory categories
-// stay usable in the POS, but never appear on the customer-facing storefront.
+// The public shop is a sneaker boutique. Legacy non-footwear seeds are removed
+// from the admin catalogue; staff-only extras still never reach shoppers.
 const FOOTWEAR_IDS = new Set(['shoes', 'slides', 'sneakers', 'trainers', 'sandals']);
 const FOOTWEAR_LABEL = /sneaker|shoe|slide|sandal|trainer|footwear|kicks/i;
+const STAFF_ONLY_IDS = new Set(['other']);
 
 function isFootwearCategory(category) {
+  if (STAFF_ONLY_IDS.has(category.id)) return false;
   return FOOTWEAR_IDS.has(category.id) || FOOTWEAR_LABEL.test(String(category.name || ''));
 }
 

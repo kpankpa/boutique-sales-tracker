@@ -394,7 +394,7 @@
 - Short WhatsApp reference (`SW-YYMMDD-XXXX`) on cards, cart, detail page and checkout; no server order/customer record.
 - Privacy-safe allow-listed `shop_events` counters with Admin → Insights.
 - Staff confirmation SOP at `/staff/sop` and links from POS/Admin shells.
-- Public catalogue narrowed to sneakers/slides; legacy non-footwear categories stay staff-only.
+- Public catalogue narrowed to sneakers/slides; legacy non-footwear seed products and categories are removed from the admin catalogue too.
 
 ### Still pending
 - Mobile QA on real Android and iOS devices.

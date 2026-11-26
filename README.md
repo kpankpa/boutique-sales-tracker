@@ -8,7 +8,7 @@ Phases 1–4, 6–7 and 10–12 of `DEVELOPMENT_PLAN.md` are implemented. The cu
 
 - Browser installer at `/staff/install`
 - Admin and cashier authentication with role and branch scoping
-- Product catalogue focused on sneaker pairs and slides with EU sizes; legacy apparel/accessory categories stay staff-only
+- Product catalogue focused only on sneaker pairs and slides with EU sizes; legacy apparel/accessory seeds are removed from both staff and shop views
 - Fast sale entry with size selection per pair/style
 - Dexie-backed offline outbox with replay-safe client references
 - Stock conflicts surfaced in the POS with adjust, retry and void actions
@@ -102,7 +102,7 @@ Products have a `category` and optional `size`. New installs are sneaker-focused
 - **Slides & sandals**: EU sizes (36–47).
 - **Sneaker extras / Other**: no size, or custom; kept for POS use and never published to shoppers.
 
-Legacy apparel and accessory categories remain usable in the POS, but `GET /api/shop/catalog` only publishes footwear categories and their products.
+A one-time cleanup removes legacy dresses, bags, belts, old sandals and QA seed items from the admin catalogue along with their stock and sale lines. `GET /api/shop/catalog` publishes only sneakers and slides; "Sneaker extras / Other" stays staff-only.
 
 In Admin → Products, pick a category, enter a style code, select sizes, and save once. The app creates one SKU per size (`STYLE-SIZE`), tracks stock per branch and size, and the POS prompts for size when selling. Opening stock is applied per size.
 
