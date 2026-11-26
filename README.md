@@ -4,11 +4,11 @@ Till, stock and customer tracker for **Sneakwise**, a sneaker boutique in Ghana.
 
 ## Current phase
 
-Phases 1–4 and 6–7 of `DEVELOPMENT_PLAN.md` are implemented and deployed. Phases 10–12 add the public storefront:
+Phases 1–4, 6–7 and 10–12 of `DEVELOPMENT_PLAN.md` are implemented. The current storefront pass adds product details, structured choices, order references, privacy-safe analytics and a staff SOP:
 
 - Browser installer at `/staff/install`
 - Admin and cashier authentication with role and branch scoping
-- Product catalogue with sneaker categories and EU sizes (sneakers, slides & sandals, apparel, bottoms, accessories)
+- Product catalogue focused on sneaker pairs and slides with EU sizes; legacy apparel/accessory categories stay staff-only
 - Fast sale entry with size selection per pair/style
 - Dexie-backed offline outbox with replay-safe client references
 - Stock conflicts surfaced in the POS with adjust, retry and void actions
@@ -16,8 +16,10 @@ Phases 1–4 and 6–7 of `DEVELOPMENT_PLAN.md` are implemented and deployed. Ph
 - Customer records with consent timestamp and credit fields
 - Daily branch summary, low stock, audit log and notification outbox
 - Public storefront at `/shop` with filters, product cards, wishlist and cart
-- Checkout that builds a structured WhatsApp order with items, sizes, quantities, prices and total
-- Admin → Shop settings for the WhatsApp destination and company name
+- Quick-view drawer and a dedicated `/shop/product/[id]` page with size selection, size guide, safety notes and recommended pairs
+- Checkout that builds a structured WhatsApp order with items, sizes, quantities, prices, delivery/payment preferences, a short reference and the total
+- Privacy-safe storefront counters with an Admin → Insights tab and a `/staff/sop` confirmation guide
+- Admin → Shop settings for the WhatsApp destination, company name, delivery choices and payment preferences
 
 Checkout is a WhatsApp handoff only: it does not create a sale, customer or stock movement. Staff confirm payment and record the sale in the POS. Owner notifications and GRA E-VAT are not implemented yet.
 
@@ -94,27 +96,29 @@ Admins also have **Admin → Stock** for deliveries, stock counts and write-offs
 
 ## Product sizes
 
-Products have a `category` and optional `size`. Categories include preset sizes:
+Products have a `category` and optional `size`. New installs are sneaker-focused:
 
 - **Sneakers**: EU sizes (36–47), custom allowed.
 - **Slides & sandals**: EU sizes (36–47).
-- **Apparel**: XS–XXL, Free size.
-- **Bottoms**: waist sizes (28–42).
-- **Accessories / Other**: no size, or custom.
+- **Sneaker extras / Other**: no size, or custom; kept for POS use and never published to shoppers.
+
+Legacy apparel and accessory categories remain usable in the POS, but `GET /api/shop/catalog` only publishes footwear categories and their products.
 
 In Admin → Products, pick a category, enter a style code, select sizes, and save once. The app creates one SKU per size (`STYLE-SIZE`), tracks stock per branch and size, and the POS prompts for size when selling. Opening stock is applied per size.
 
 ## Public storefront and WhatsApp checkout
 
-The storefront lives at `/shop`. It reads `GET /api/shop/catalog`, a public but deliberately narrow projection: active products, safe images, prices, category labels and summed availability across active branches. Cost price, barcodes, branch names, staff and customer data are never returned.
+The storefront lives at `/shop`. It reads `GET /api/shop/catalog`, a public but deliberately narrow projection: active footwear products, safe images, prices, category labels, delivery/payment choices, a size guide and summed availability across active branches. Cost price, barcodes, branch names, staff and customer data are never returned.
 
-Visitors can search, filter by category and size, save favourites, build a bag, and open `/shop/checkout`. For a faster handoff, each product card has **Order on WhatsApp** for that exact size, and the cart has **Send bag on WhatsApp** for the whole selection. The checkout form adds the customer name, phone, payment preference and note. Checkout re-reads the catalogue, then builds a message like:
+Visitors can search, filter by category and size, save favourites, build a bag, and open `/shop/checkout`. A card tap opens a **quick-view drawer** with size pills and the size guide; the full `/shop/product/[id]` page adds a spec block, wishlist action, WhatsApp reference, message preview and **You may also like** pairs from `GET /api/shop/product?id=…`. For a faster handoff, each product card has **Order on WhatsApp** for that exact size, and the cart has **Send bag on WhatsApp** for the whole selection. The checkout form adds the customer name, phone, structured delivery/payment choices and an optional note. Checkout re-reads the catalogue, then builds a message like:
 
 ```text
 *NEW ORDER — Sneakwise*
+*Ref:* SW-260411-A1B2
 
 *Customer:* Kwame Mensah
 *Phone:* 0241234567
+*Delivery:* Pickup at Sneakwise — confirmed on WhatsApp
 *Payment preference:* Pay on delivery
 
 *Items:*
@@ -125,7 +129,11 @@ Visitors can search, filter by category and size, save favourites, build a bag, 
 Please confirm availability and delivery details. Thank you!
 ```
 
+The reference is a short browser-generated handoff label (`SW-YYMMDD-XXXX`). It does **not** create an order, customer, payment or stock record. Delivery and payment entries are owner-configurable preferences only; the shop must never ask for card numbers, CVV, MoMo PINs or OTPs in chat.
+
 Set the destination number in **Admin → Shop settings**. Ghana numbers entered as `024…` are converted to `23324…`. `STORE_WHATSAPP_NUMBER` in the environment is a deployment fallback. If no number is configured, checkout offers a copyable order message instead of a broken link. The cart is not cleared automatically; the shopper clears it after sending the WhatsApp message.
+
+Privacy-safe counters are sent to `POST /api/shop/events` with an anonymous browser session key and allow-listed metadata such as SKU, size, quantity, source and reference. Names, phone numbers, addresses, notes, payment data, IP addresses and user agents are never sent or stored. Admin → **Insights** shows counts, sessions and top products. Staff follow `/staff/sop` to read the reference, check live stock, confirm preferences, record one POS sale and send the receipt.
 
 ## Barcode and QR scanning
 

@@ -3,14 +3,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useStorefront } from './StorefrontProvider';
 import { buildOrderMessage, buildWhatsappUrl, money } from '../../viewmodels/storefront/whatsapp';
+import { trackShopEvent } from '../../viewmodels/storefront/analytics';
 
 export default function CartView() {
-  const { catalog, cart, subtotal, updateQty, removeFromCart } = useStorefront();
+  const { catalog, cart, subtotal, updateQty, removeFromCart, orderReference } = useStorefront();
   const [copied, setCopied] = useState(false);
 
   const orderMessage = useMemo(
-    () => buildOrderMessage({ companyName: catalog.companyName, items: cart }),
-    [catalog.companyName, cart]
+    () => buildOrderMessage({ companyName: catalog.companyName, items: cart, reference: orderReference }),
+    [catalog.companyName, cart, orderReference]
   );
   const orderUrl = useMemo(
     () => buildWhatsappUrl(catalog.whatsappNumber, orderMessage),
@@ -27,9 +28,14 @@ export default function CartView() {
     try {
       await navigator.clipboard.writeText(orderMessage);
       setCopied(true);
+      trackShopEvent('order_copied', { meta: { source: 'cart', lines: cart.length, reference: orderReference } });
     } catch {
       window.prompt('Copy your order text:', orderMessage);
     }
+  };
+
+  const openWhatsapp = () => {
+    trackShopEvent('whatsapp_click', { meta: { source: 'cart', lines: cart.length, reference: orderReference } });
   };
 
   if (cart.length === 0) {
@@ -108,12 +114,14 @@ export default function CartView() {
           <strong>{money(subtotal)}</strong>
         </div>
 
+        <div className="shop-ref-badge"><span>WhatsApp ref</span><strong>{orderReference || '—'}</strong></div>
         {orderUrl ? (
           <a
             className="btn shop-whatsapp shop-checkout-link"
             href={orderUrl}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={openWhatsapp}
           >
             Send bag on WhatsApp
           </a>

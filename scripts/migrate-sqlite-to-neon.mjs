@@ -27,11 +27,11 @@ const source = createClient({ url: sourceUrl });
 const tables = [
   'settings', 'branches', 'users', 'categories', 'products', 'customers',
   'stock', 'sales', 'sale_lines', 'credit_payments',
-  'notification_outbox', 'audit_log', 'login_attempts'
+  'notification_outbox', 'audit_log', 'login_attempts', 'shop_events'
 ];
 const identityTables = [
   'branches', 'users', 'products', 'customers', 'sales',
-  'sale_lines', 'credit_payments', 'notification_outbox', 'audit_log'
+  'sale_lines', 'credit_payments', 'notification_outbox', 'audit_log', 'shop_events'
 ];
 
 const target = new pg.Pool({ connectionString: targetUrl, max: 1 });

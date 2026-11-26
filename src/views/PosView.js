@@ -272,7 +272,8 @@ export default function PosView() {
       sessionExpiring={sessionExpiring}
       links={[
         { href: '/staff/pos', label: 'POS' },
-        ...(user.role === 'admin' ? [{ href: '/staff/admin', label: 'Admin' }] : [])
+        ...(user.role === 'admin' ? [{ href: '/staff/admin', label: 'Admin' }] : []),
+        { href: '/staff/sop', label: 'Order SOP' }
       ]}
     >
       {pos.offline && <div className="alert alert-warn">You are offline. Sales will be queued on this device.</div>}

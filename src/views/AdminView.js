@@ -18,7 +18,7 @@ import { decodeProductQr, productQrValue } from './productQr';
 
 const blankProduct = {
   name: '',
-  category: 'clothing',
+  category: 'shoes',
   sku: '',
   size: '',
   sizes: [],
@@ -52,7 +52,7 @@ export default function AdminView() {
   const [editingUserId, setEditingUserId] = useState(null);
   const [branch, setBranch] = useState(blankBranch);
   const [stockAdjustment, setStockAdjustment] = useState(blankStock);
-  const [shopForm, setShopForm] = useState({ companyName: '', whatsappNumber: '' });
+  const [shopForm, setShopForm] = useState({ companyName: '', whatsappNumber: '', deliveryOptions: '', paymentOptions: '' });
   const [stockBranchId, setStockBranchId] = useState('');
   const [stockFormError, setStockFormError] = useState('');
   const [search, setSearch] = useState('');
@@ -79,7 +79,9 @@ export default function AdminView() {
     if (admin.shopSettings.companyName) {
       setShopForm({
         companyName: admin.shopSettings.companyName,
-        whatsappNumber: admin.shopSettings.whatsappNumber || ''
+        whatsappNumber: admin.shopSettings.whatsappNumber || '',
+        deliveryOptions: (admin.shopSettings.deliveryOptions || []).join('\n'),
+        paymentOptions: (admin.shopSettings.paymentOptions || []).join('\n')
       });
     }
   }, [admin.shopSettings]);
@@ -203,6 +205,7 @@ export default function AdminView() {
   const filteredBranches = admin.branches.filter((row) => match(row.name, row.code));
   const filteredOutbox = admin.outbox.filter((row) => match(row.event_type, row.status, row.payload));
   const filteredAudit = admin.audit.filter((row) => match(row.action, row.entity, row.actor_name, row.details));
+  const analyticsByName = (name) => admin.analytics?.totals?.find((row) => row.eventName === name)?.events || 0;
 
   const toggleSize = (size) => {
     setProduct((current) => {
@@ -333,7 +336,11 @@ export default function AdminView() {
       user={user}
       onSignOut={signOut}
       sessionExpiring={sessionExpiring}
-      links={[{ href: '/staff/pos', label: 'POS' }, { href: '/staff/admin', label: 'Admin' }]}
+      links={[
+        { href: '/staff/pos', label: 'POS' },
+        { href: '/staff/admin', label: 'Admin' },
+        { href: '/staff/sop', label: 'Order SOP' }
+      ]}
     >
       <div className="page-head">
         <div className="row-between">
@@ -1116,6 +1123,39 @@ export default function AdminView() {
         </div>
       )}
 
+      {admin.tab === 'Insights' && (
+        <div className="stack">
+          <div className="stats-grid">
+            <Card><p className="stat-label">Shop views</p><p className="stat-value">{analyticsByName('shop_view')}</p></Card>
+            <Card><p className="stat-label">Product opens</p><p className="stat-value">{analyticsByName('product_open')}</p></Card>
+            <Card><p className="stat-label">Add to bag</p><p className="stat-value">{analyticsByName('add_to_cart')}</p></Card>
+            <Card><p className="stat-label">WhatsApp clicks</p><p className="stat-value">{analyticsByName('whatsapp_click')}</p></Card>
+          </div>
+          <Card title="Storefront analytics" subtitle="Privacy-safe counts only. No names, phone numbers, addresses or payment details are stored.">
+            <Table
+              columns={[
+                { key: 'eventName', label: 'Event' },
+                { key: 'events', label: 'Events' },
+                { key: 'sessions', label: 'Sessions' }
+              ]}
+              rows={admin.analytics?.totals || []}
+              empty="No storefront events yet."
+            />
+          </Card>
+          <Card title="Top products" subtitle="Based on product opens, add-to-bag and WhatsApp clicks.">
+            <Table
+              columns={[
+                { key: 'name', label: 'Product' },
+                { key: 'sku', label: 'SKU' },
+                { key: 'events', label: 'Events' }
+              ]}
+              rows={admin.analytics?.topProducts || []}
+              empty="No product events yet."
+            />
+          </Card>
+        </div>
+      )}
+
       {admin.tab === 'Shop settings' && (
         <div className="stack">
           <Card title="Storefront" subtitle="Public shop details shown at checkout.">
@@ -1123,7 +1163,11 @@ export default function AdminView() {
               className="form-grid"
               onSubmit={(event) => {
                 event.preventDefault();
-                admin.updateShopSettings(shopForm);
+                admin.updateShopSettings({
+                  ...shopForm,
+                  deliveryOptions: shopForm.deliveryOptions.split('\n').map((value) => value.trim()).filter(Boolean),
+                  paymentOptions: shopForm.paymentOptions.split('\n').map((value) => value.trim()).filter(Boolean)
+                });
               }}
             >
               <Field label="Company name" hint="Used on the shop and receipts.">
@@ -1146,18 +1190,26 @@ export default function AdminView() {
                   maxLength={30}
                 />
               </Field>
+              <Field label="Delivery options" hint="One option per line. Shown as checkout choices.">
+                <textarea className="input shop-textarea" rows={4} value={shopForm.deliveryOptions} onChange={(event) => setShopForm((current) => ({ ...current, deliveryOptions: event.target.value }))} />
+              </Field>
+              <Field label="Payment preferences" hint="One option per line. These are preferences only; no payment is collected online.">
+                <textarea className="input shop-textarea" rows={4} value={shopForm.paymentOptions} onChange={(event) => setShopForm((current) => ({ ...current, paymentOptions: event.target.value }))} />
+              </Field>
               <div className="row-between">
                 <Button type="submit">Save shop settings</Button>
                 <a href="/shop" target="_blank" rel="noopener noreferrer">Open the storefront ↗</a>
               </div>
             </form>
           </Card>
-          <Card title="Checkout handoff" subtitle="How customer orders reach the shop.">
-            <p className="muted">
-              Customers build a bag on the public storefront, then tap “Send order on WhatsApp”.
-              The message carries every item, size, quantity, price and the total. No sale is created
-              until staff confirm payment and record it in the POS.
-            </p>
+          <Card title="Checkout handoff SOP" subtitle="How staff should handle WhatsApp orders.">
+            <ol className="shop-sop">
+              <li><strong>Read the reference.</strong> Every WhatsApp order includes a Ref like <code>SW-260411-A1B2</code>. Quote it in the chat.</li>
+              <li><strong>Confirm stock live.</strong> Storefront availability is not a reservation. Check the selected size in the correct branch before taking payment.</li>
+              <li><strong>Confirm delivery and payment.</strong> Use the structured choices in the message. Never ask for card numbers or MoMo PINs in chat.</li>
+              <li><strong>Record the sale in POS.</strong> Only after confirmation, create the sale in <a href="/staff/pos">/staff/pos</a> with the right branch, cashier and payment method.</li>
+              <li><strong>Close the loop.</strong> Send the receipt in WhatsApp. If stock changed, adjust it before confirming another order.</li>
+            </ol>
           </Card>
         </div>
       )}

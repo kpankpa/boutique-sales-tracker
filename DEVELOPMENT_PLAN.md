@@ -387,23 +387,34 @@
 
 **Goal:** Make the public flow safe for real customers.
 
-### Must-have features
+### Implemented in this pass
+- Product quick-view drawer with size pills, sneaker size guide and exact-size WhatsApp handoff.
+- Dedicated `/shop/product/[id]` page with specs, wishlist, safety notes, reference, message preview and recommended pairs.
+- Owner-configurable delivery/payment choices in Admin → Shop settings; choices are preferences only.
+- Short WhatsApp reference (`SW-YYMMDD-XXXX`) on cards, cart, detail page and checkout; no server order/customer record.
+- Privacy-safe allow-listed `shop_events` counters with Admin → Insights.
+- Staff confirmation SOP at `/staff/sop` and links from POS/Admin shells.
+- Public catalogue narrowed to sneakers/slides; legacy non-footwear categories stay staff-only.
+
+### Still pending
 - Mobile QA on real Android and iOS devices.
 - Verify stock and price changes appear within one fresh page load.
 - Database connection failures must surface as infrastructure errors, never as "not installed".
 - Idle PostgreSQL pool client errors are logged, not allowed to crash the server.
 - Verify no public API field leaks internal pricing or staff data.
 - Owner training: reading WhatsApp orders, confirming payment, recording the POS sale.
-- Vercel environment fallback for the WhatsApp number.
+- Vercel environment fallback and a real WhatsApp Business number.
+- One live phone order before pilot sign-off.
 
-### Recommended features
-- Lightweight storefront visit/order-start counters.
+### Deferred recommendations
 - Saved delivery notes for repeat customers, only with explicit consent.
 - Product badge for "just landed".
 
 ### Exit criteria
+- A shopper can open a full sneaker detail page, check the size guide and add or order that exact pair.
+- The owner receives one readable order with reference, delivery/payment preferences and all items before stock is reserved.
+- Insights contains counts only and never personal or payment details.
 - Two staff members can run an end-to-end order without developer help.
-- The owner receives one readable order with all items before stock is reserved.
 
 ---
 

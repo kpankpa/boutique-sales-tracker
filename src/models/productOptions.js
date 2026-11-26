@@ -14,26 +14,8 @@ export const productCategories = [
     sizes: sneakerSizes
   },
   {
-    id: 'clothing',
-    label: 'Apparel',
-    sizeLabel: 'Clothing size',
-    sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free size']
-  },
-  {
-    id: 'trousers',
-    label: 'Bottoms',
-    sizeLabel: 'Waist size',
-    sizes: ['28', '30', '32', '34', '36', '38', '40', '42']
-  },
-  {
-    id: 'accessories',
-    label: 'Accessories',
-    sizeLabel: 'Size',
-    sizes: []
-  },
-  {
     id: 'other',
-    label: 'Other',
+    label: 'Sneaker extras',
     sizeLabel: 'Size',
     sizes: []
   }

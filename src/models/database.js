@@ -283,10 +283,20 @@ const schema = [
     locked_until TEXT,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
+  `CREATE TABLE IF NOT EXISTS shop_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_name TEXT NOT NULL,
+    session_key TEXT,
+    product_id INTEGER,
+    category TEXT,
+    meta TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
   `CREATE INDEX IF NOT EXISTS idx_sales_branch_date ON sales(branch_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS idx_sales_customer ON sales(customer_id)`,
   `CREATE INDEX IF NOT EXISTS idx_sale_lines_sale ON sale_lines(sale_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_outbox_status ON notification_outbox(status)`
+  `CREATE INDEX IF NOT EXISTS idx_outbox_status ON notification_outbox(status)`,
+  `CREATE INDEX IF NOT EXISTS idx_shop_events_name_date ON shop_events(event_name, created_at)`
 ];
 
 function toPostgresDdl(statement) {
@@ -333,15 +343,13 @@ export async function createSchema() {
     'CREATE UNIQUE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode) WHERE barcode IS NOT NULL'
   );
 
-  // Sneakwise sells sneakers first: EU-sized pairs, slides, and small add-ons.
+  // Sneakwise sells sneakers and slides. "Other" stays in the POS for odd
+  // footwear lines but is never published to the storefront.
   const sneakerSizes = JSON.stringify(['36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46', '47']);
   const defaultCategories = [
     ['shoes', 'Sneakers', 'EU size', sneakerSizes],
     ['slides', 'Slides & sandals', 'EU size', sneakerSizes],
-    ['clothing', 'Apparel', 'Clothing size', JSON.stringify(['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free size'])],
-    ['trousers', 'Bottoms', 'Waist size', JSON.stringify(['28', '30', '32', '34', '36', '38', '40', '42'])],
-    ['accessories', 'Accessories', 'Size', '[]'],
-    ['other', 'Other', 'Size', '[]']
+    ['other', 'Sneaker extras', 'Size', '[]']
   ];
   for (const [id, name, sizeLabel, sizesJson] of defaultCategories) {
     await database.execute({
@@ -354,9 +362,8 @@ export async function createSchema() {
   // but untouched generic labels become sneaker-boutique labels.
   for (const [id, oldName, name, sizeLabel, sizesJson] of [
     ['shoes', 'Shoes', 'Sneakers', 'EU size', sneakerSizes],
-    ['clothing', 'Dresses / shirts', 'Apparel', 'Clothing size', defaultCategories[2][3]],
-    ['trousers', 'Trousers / shorts', 'Bottoms', 'Waist size', defaultCategories[3][3]],
-    ['accessories', 'Accessories / no size', 'Accessories', 'Size', '[]']
+    ['slides', 'Slides / sandals', 'Slides & sandals', 'EU size', sneakerSizes],
+    ['other', 'Other', 'Sneaker extras', 'Size', '[]']
   ]) {
     await database.execute({
       sql: 'UPDATE categories SET name = ?, size_label = ?, sizes_json = ? WHERE id = ? AND name = ?',

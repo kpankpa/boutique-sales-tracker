@@ -12,6 +12,7 @@ export const adminTabs = [
   'Staff',
   'Branches',
   'Outbox',
+  'Insights',
   'Shop settings'
 ];
 
@@ -28,7 +29,13 @@ export function useAdmin() {
   const [branches, setBranches] = useState([]);
   const [outbox, setOutbox] = useState([]);
   const [audit, setAudit] = useState([]);
-  const [shopSettings, setShopSettings] = useState({ companyName: '', whatsappNumber: '' });
+  const [analytics, setAnalytics] = useState({ windowDays: 14, totals: [], topProducts: [], daily: [] });
+  const [shopSettings, setShopSettings] = useState({
+    companyName: '',
+    whatsappNumber: '',
+    deliveryOptions: [],
+    paymentOptions: []
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -97,6 +104,9 @@ export function useAdmin() {
           setAudit(log);
           break;
         }
+        case 'Insights':
+          setAnalytics(await apiGet('/shop/analytics?days=14'));
+          break;
         case 'Shop settings':
           setShopSettings(await apiGet('/settings'));
           break;
@@ -152,6 +162,7 @@ export function useAdmin() {
     branches,
     outbox,
     audit,
+    analytics,
     shopSettings,
     loading,
     error,

@@ -3,6 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { apiGet } from '../../viewmodels/api';
 import { cartSubtotal } from '../../viewmodels/storefront/whatsapp';
+import { trackShopEvent } from '../../viewmodels/storefront/analytics';
+import { getOrderReference, rotateOrderReference } from '../../viewmodels/storefront/reference';
 import {
   cartKey,
   readCart,
@@ -15,6 +17,9 @@ import {
 const emptyCatalog = {
   companyName: 'Sneakwise',
   whatsappNumber: '',
+  deliveryOptions: [],
+  paymentOptions: [],
+  sizeGuide: null,
   categories: [],
   products: []
 };
@@ -28,10 +33,12 @@ export function StorefrontProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [hydrated, setHydrated] = useState(false);
+  const [orderReference, setOrderReference] = useState('');
 
   useEffect(() => {
     setCart(readCart());
     setWishlist(readWishlist());
+    setOrderReference(getOrderReference());
     setHydrated(true);
   }, []);
 
@@ -39,6 +46,9 @@ export function StorefrontProvider({ children }) {
     const nextCatalog = {
       companyName: data?.companyName || 'Sneakwise',
       whatsappNumber: data?.whatsappNumber || '',
+      deliveryOptions: Array.isArray(data?.deliveryOptions) ? data.deliveryOptions : [],
+      paymentOptions: Array.isArray(data?.paymentOptions) ? data.paymentOptions : [],
+      sizeGuide: data?.sizeGuide && typeof data.sizeGuide === 'object' ? data.sizeGuide : null,
       categories: Array.isArray(data?.categories) ? data.categories : [],
       products: Array.isArray(data?.products) ? data.products : []
     };
@@ -69,6 +79,10 @@ export function StorefrontProvider({ children }) {
     if (hydrated) refreshCatalog();
   }, [hydrated, refreshCatalog]);
 
+  useEffect(() => {
+    if (hydrated) trackShopEvent('shop_view', { meta: { source: 'catalog' } });
+  }, [hydrated]);
+
   const addToCart = useCallback((product, requestedQty = 1) => {
     if (!product?.available) return false;
     const qty = Math.max(1, Number(requestedQty) || 1);
@@ -97,6 +111,11 @@ export function StorefrontProvider({ children }) {
       writeCart(capped);
       return capped;
     });
+    trackShopEvent('add_to_cart', {
+      productId: product.id,
+      category: product.category,
+      meta: { sku: product.sku, size: product.size || 'one-size', qty }
+    });
     return true;
   }, []);
 
@@ -124,6 +143,7 @@ export function StorefrontProvider({ children }) {
   const clearCart = useCallback(() => {
     setCart([]);
     writeCart([]);
+    setOrderReference(rotateOrderReference());
   }, []);
 
   const toggleWishlist = useCallback((productId) => {
@@ -140,6 +160,7 @@ export function StorefrontProvider({ children }) {
     catalog,
     cart,
     wishlist,
+    orderReference,
     loading,
     error,
     refreshCatalog,
@@ -152,7 +173,7 @@ export function StorefrontProvider({ children }) {
     cartCount: cart.reduce((total, item) => total + item.qty, 0),
     subtotal: cartSubtotal(cart)
   }), [
-    catalog, cart, wishlist, loading, error, refreshCatalog,
+    catalog, cart, wishlist, orderReference, loading, error, refreshCatalog,
     addToCart, updateQty, removeFromCart, clearCart, toggleWishlist
   ]);
 

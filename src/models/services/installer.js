@@ -13,9 +13,9 @@ const demoProducts = [
   { sku: 'SN-NVY-42', name: 'Navy low-top sneakers', category: 'shoes', size: '42', price: 320, cost: 170 },
   { sku: 'SN-WHT-43', name: 'White court sneakers', category: 'shoes', size: '43', price: 340, cost: 180 },
   { sku: 'SN-BLK-44', name: 'Black runners', category: 'shoes', size: '44', price: 360, cost: 195 },
+  { sku: 'SN-WHT-45', name: 'White court sneakers', category: 'shoes', size: '45', price: 340, cost: 180 },
   { sku: 'SL-SND-40', name: 'Sand slide sandals', category: 'slides', size: '40', price: 140, cost: 65 },
-  { sku: 'AC-SCK-01', name: 'White crew socks', category: 'accessories', size: null, price: 35, cost: 15 },
-  { sku: 'AC-LCE-01', name: 'Replacement laces', category: 'accessories', size: null, price: 20, cost: 8 }
+  { sku: 'SL-BLK-41', name: 'Black slide sandals', category: 'slides', size: '41', price: 140, cost: 65 }
 ];
 
 const demoCustomers = [

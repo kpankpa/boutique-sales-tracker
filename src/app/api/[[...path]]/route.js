@@ -32,7 +32,8 @@ import { lookupCode } from '../../../models/services/lookupService';
 import { presignProductImage } from '../../../models/services/uploadService';
 import { adjustStockFromInput } from '../../../models/services/stockService';
 import { dailySummary, lowStock } from '../../../models/services/reportService';
-import { getShopCatalog, getShopSettings, updateShopSettings } from '../../../models/services/storeService';
+import { getShopCatalog, getShopProduct, getShopSettings, updateShopSettings } from '../../../models/services/storeService';
+import { getShopAnalytics, recordShopEvent } from '../../../models/services/shopAnalyticsService';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -121,8 +122,17 @@ async function handle(request, context) {
       return ok();
     }
 
-    // Public storefront: safe catalogue projection, no session required.
+    // Public storefront: safe catalogue projection and privacy-safe funnel events.
     if (key === 'shop/catalog' && method === 'GET') return ok(await getShopCatalog());
+    if (key === 'shop/product' && method === 'GET') {
+      const id = new URL(request.url).searchParams.get('id');
+      const detail = await getShopProduct(id);
+      return detail ? ok(detail) : fail('Product not found.', 404);
+    }
+    if (key === 'shop/events' && method === 'POST') {
+      const body = await request.json().catch(() => ({}));
+      return ok(await recordShopEvent(body));
+    }
 
     const user = await signedInUser();
     if (!user) return fail('Please sign in.', 401);
@@ -295,6 +305,13 @@ async function handle(request, context) {
       const denied = requireAdmin(user);
       if (denied) return denied;
       return ok(await listAudit());
+    }
+
+    if (key === 'shop/analytics' && method === 'GET') {
+      const denied = requireAdmin(user);
+      if (denied) return denied;
+      const days = Number(new URL(request.url).searchParams.get('days')) || 14;
+      return ok(await getShopAnalytics(days));
     }
 
     return fail('Endpoint not found.', 404);

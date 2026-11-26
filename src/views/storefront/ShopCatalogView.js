@@ -50,7 +50,7 @@ export default function ShopCatalogView() {
           <span className="shop-eyebrow">Sneakwise · Ghana</span>
           <h1>Fresh pairs. Straight to your WhatsApp.</h1>
           <p>
-            Browse the latest sneakers, slides and essentials. Choose your size,
+            Browse the latest sneakers and slides. Choose your size,
             build a bag and send your order in one tap — no account needed.
           </p>
           <div className="shop-hero-actions">
