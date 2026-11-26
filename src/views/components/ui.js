@@ -238,7 +238,7 @@ export function Shell({ user, onSignOut, links = [], sessionExpiring = false, ch
     <div className="shell">
       <header className="topbar">
         <div>
-          <span className="brand">SLAWN POS</span>
+          <span className="brand">SNEAKWISE</span>
           <span className="topbar-sub">{user?.name}</span>
         </div>
         <nav className="topnav">

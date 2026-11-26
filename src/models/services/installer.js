@@ -9,13 +9,13 @@ import { findCustomerByPhone, insertCustomer } from '../repositories/customers';
 import { normalizeCode, required } from '../validation';
 
 const demoProducts = [
-  { sku: 'DS-ANK-BLK-M', name: 'Ankara dress, black', category: 'clothing', size: 'M', price: 180, cost: 95 },
-  { sku: 'DS-ANK-BLK-L', name: 'Ankara dress, black', category: 'clothing', size: 'L', price: 180, cost: 95 },
-  { sku: 'DS-ANK-RED-L', name: 'Ankara dress, red', category: 'clothing', size: 'L', price: 190, cost: 100 },
-  { sku: 'HB-014-WHT', name: 'White handbag', category: 'accessories', size: null, price: 120, cost: 60 },
-  { sku: 'SC-022-GLD', name: 'Gold scarf', category: 'accessories', size: null, price: 65, cost: 28 },
-  { sku: 'SH-NVY-39', name: 'Navy sandals', category: 'shoes', size: '39', price: 150, cost: 80 },
-  { sku: 'SH-NVY-40', name: 'Navy sandals', category: 'shoes', size: '40', price: 150, cost: 80 }
+  { sku: 'SN-NVY-41', name: 'Navy low-top sneakers', category: 'shoes', size: '41', price: 320, cost: 170 },
+  { sku: 'SN-NVY-42', name: 'Navy low-top sneakers', category: 'shoes', size: '42', price: 320, cost: 170 },
+  { sku: 'SN-WHT-43', name: 'White court sneakers', category: 'shoes', size: '43', price: 340, cost: 180 },
+  { sku: 'SN-BLK-44', name: 'Black runners', category: 'shoes', size: '44', price: 360, cost: 195 },
+  { sku: 'SL-SND-40', name: 'Sand slide sandals', category: 'slides', size: '40', price: 140, cost: 65 },
+  { sku: 'AC-SCK-01', name: 'White crew socks', category: 'accessories', size: null, price: 35, cost: 15 },
+  { sku: 'AC-LCE-01', name: 'Replacement laces', category: 'accessories', size: null, price: 20, cost: 8 }
 ];
 
 const demoCustomers = [

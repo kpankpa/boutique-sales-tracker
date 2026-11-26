@@ -17,5 +17,5 @@ export default function Home() {
       .catch(() => router.replace('/install'));
   }, [router]);
 
-  return <div className="center-screen"><p>Opening Slawn POS…</p></div>;
+  return <div className="center-screen"><p>Opening Sneakwise POS…</p></div>;
 }

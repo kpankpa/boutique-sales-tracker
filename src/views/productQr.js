@@ -4,7 +4,9 @@
 // object so scanning one can fill the Admin product form even for an item that
 // is not in the catalogue yet. Plain codes still work through the normal
 // catalogue lookup path.
-const PREFIX = 'SLAWN1:';
+const PREFIX = 'SW1:';
+// Labels printed before the Sneakwise rebrand still carry this prefix.
+const LEGACY_PREFIX = 'SLAWN1:';
 const MAX_DECODE_LENGTH = 2000;
 
 function toBase64Url(value) {
@@ -44,9 +46,10 @@ export function productQrValue(product) {
 
 export function decodeProductQr(raw) {
   const value = String(raw || '').trim();
-  if (!value.startsWith(PREFIX) || value.length > MAX_DECODE_LENGTH) return null;
+  const prefix = value.startsWith(PREFIX) ? PREFIX : value.startsWith(LEGACY_PREFIX) ? LEGACY_PREFIX : null;
+  if (!prefix || value.length > MAX_DECODE_LENGTH) return null;
   try {
-    const payload = JSON.parse(fromBase64Url(value.slice(PREFIX.length)));
+    const payload = JSON.parse(fromBase64Url(value.slice(prefix.length)));
     if (payload?.v !== 1) return null;
     if (!payload.n || typeof payload.n !== 'string') return null;
     if (!payload.s || typeof payload.s !== 'string') return null;

@@ -1,4 +1,4 @@
-# UI/UX Guide — Slawn POS
+# UI/UX Guide — Sneakwise POS
 
 This guide is the design input for the project. It replaces a formal imported UI/UX skill pack and is applied in the component library and screens.
 

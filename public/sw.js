@@ -1,4 +1,4 @@
-const cacheName = 'slawn-pos-v1';
+const cacheName = 'sneakwise-pos-v1';
 const shell = ['/', '/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', (event) => {

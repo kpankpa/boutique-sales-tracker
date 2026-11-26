@@ -1,25 +1,33 @@
+const sneakerSizes = ['36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46', '47'];
+
 export const productCategories = [
   {
     id: 'shoes',
-    label: 'Shoes',
-    sizeLabel: 'Shoe size',
-    sizes: ['38', '39', '40', '41', '42', '43', '44', '45', '46']
+    label: 'Sneakers',
+    sizeLabel: 'EU size',
+    sizes: sneakerSizes
+  },
+  {
+    id: 'slides',
+    label: 'Slides & sandals',
+    sizeLabel: 'EU size',
+    sizes: sneakerSizes
   },
   {
     id: 'clothing',
-    label: 'Dresses / shirts',
+    label: 'Apparel',
     sizeLabel: 'Clothing size',
     sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free size']
   },
   {
     id: 'trousers',
-    label: 'Trousers / shorts',
+    label: 'Bottoms',
     sizeLabel: 'Waist size',
     sizes: ['28', '30', '32', '34', '36', '38', '40', '42']
   },
   {
     id: 'accessories',
-    label: 'Accessories / no size',
+    label: 'Accessories',
     sizeLabel: 'Size',
     sizes: []
   },

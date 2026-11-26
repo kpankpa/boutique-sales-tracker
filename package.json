@@ -1,8 +1,8 @@
 {
-  "name": "slawn-pos",
+  "name": "sneakwise-pos",
   "version": "0.1.0",
   "private": true,
-  "description": "Lightweight multi-branch POS, CRM and sale-capture app for boutiques in Ghana",
+  "description": "Till, stock and customer tracker for Sneakwise Sneaker Boutique",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

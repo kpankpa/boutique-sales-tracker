@@ -330,17 +330,77 @@ export async function createSchema() {
     'CREATE UNIQUE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode) WHERE barcode IS NOT NULL'
   );
 
+  // Sneakwise sells sneakers first: EU-sized pairs, slides, and small add-ons.
+  const sneakerSizes = JSON.stringify(['36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46', '47']);
   const defaultCategories = [
-    ['shoes', 'Shoes', 'Shoe size', JSON.stringify(['38', '39', '40', '41', '42', '43', '44', '45', '46'])],
-    ['clothing', 'Dresses / shirts', 'Clothing size', JSON.stringify(['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free size'])],
-    ['trousers', 'Trousers / shorts', 'Waist size', JSON.stringify(['28', '30', '32', '34', '36', '38', '40', '42'])],
-    ['accessories', 'Accessories / no size', 'Size', '[]'],
+    ['shoes', 'Sneakers', 'EU size', sneakerSizes],
+    ['slides', 'Slides & sandals', 'EU size', sneakerSizes],
+    ['clothing', 'Apparel', 'Clothing size', JSON.stringify(['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free size'])],
+    ['trousers', 'Bottoms', 'Waist size', JSON.stringify(['28', '30', '32', '34', '36', '38', '40', '42'])],
+    ['accessories', 'Accessories', 'Size', '[]'],
     ['other', 'Other', 'Size', '[]']
   ];
   for (const [id, name, sizeLabel, sizesJson] of defaultCategories) {
     await database.execute({
       sql: insertIgnoreSql('categories', 'id, name, size_label, sizes_json', '?, ?, ?, ?', 'id'),
       args: [id, name, sizeLabel, sizesJson]
+    });
+  }
+
+  // Existing installs keep their category IDs (and therefore their products),
+  // but untouched generic labels become sneaker-boutique labels.
+  for (const [id, oldName, name, sizeLabel, sizesJson] of [
+    ['shoes', 'Shoes', 'Sneakers', 'EU size', sneakerSizes],
+    ['clothing', 'Dresses / shirts', 'Apparel', 'Clothing size', defaultCategories[2][3]],
+    ['trousers', 'Trousers / shorts', 'Bottoms', 'Waist size', defaultCategories[3][3]],
+    ['accessories', 'Accessories / no size', 'Accessories', 'Size', '[]']
+  ]) {
+    await database.execute({
+      sql: 'UPDATE categories SET name = ?, size_label = ?, sizes_json = ? WHERE id = ? AND name = ?',
+      args: [name, sizeLabel, sizesJson, id, oldName]
+    });
+  }
+
+  // Receipts and the POS header should carry the Sneakwise name. Leave a
+  // deliberately customised company name alone.
+  const company = await database.execute({
+    sql: "SELECT value FROM settings WHERE key = 'company_name'",
+    args: []
+  });
+  const companyName = String(company.rows[0]?.value ?? '').trim();
+  if (!companyName || ['Slawn POS', 'Ama Boutique', "Ama's Boutique"].includes(companyName)) {
+    await database.execute({
+      sql: `INSERT INTO settings (key, value) VALUES ('company_name', 'Sneakwise')
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      args: []
+    });
+  }
+
+  // Remove the generic sample catalogue once. Sale records are kept; their
+  // line items for these sample SKUs go with the products.
+  const demoFlag = await database.execute({
+    sql: "SELECT value FROM settings WHERE key = 'sample_products_removed'",
+    args: []
+  });
+  if (!demoFlag.rows[0]) {
+    for (const sku of [
+      'DS-ANK-BLK-M', 'DS-ANK-BLK-L', 'DS-ANK-RED-L',
+      'HB-014-WHT', 'SC-022-GLD', 'SH-NVY-39', 'SH-NVY-40'
+    ]) {
+      await database.execute({
+        sql: 'DELETE FROM sale_lines WHERE product_id IN (SELECT id FROM products WHERE sku = ?)',
+        args: [sku]
+      });
+      await database.execute({
+        sql: 'DELETE FROM stock WHERE product_id IN (SELECT id FROM products WHERE sku = ?)',
+        args: [sku]
+      });
+      await database.execute({ sql: 'DELETE FROM products WHERE sku = ?', args: [sku] });
+    }
+    await database.execute({
+      sql: `INSERT INTO settings (key, value) VALUES ('sample_products_removed', '1')
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      args: []
     });
   }
 }

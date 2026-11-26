@@ -1,7 +1,7 @@
 {
-  "name": "Slawn POS",
-  "short_name": "Slawn POS",
-  "description": "Lightweight sales tracking for boutiques",
+  "name": "Sneakwise POS",
+  "short_name": "Sneakwise",
+  "description": "Till, stock and customer tracker for Sneakwise Sneaker Boutique",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#F3F6F4",

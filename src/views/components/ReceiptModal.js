@@ -7,7 +7,7 @@ import { QrCode } from './QrCode';
 
 // Accepts both the server receipt shape (snake_case, from /sales/receipt)
 // and the fresh-sale shape built by usePos after checkout.
-export function ReceiptModal({ receipt, companyName = 'Slawn POS', onClose }) {
+export function ReceiptModal({ receipt, companyName = 'Sneakwise', onClose }) {
   const receiptNo = receipt.receiptNo ?? receipt.receipt_no;
   const lines = receipt.lines ?? [];
   const subtotal = Number(receipt.subtotal ?? lines.reduce((sum, line) => sum + Number(line.line_total ?? 0), 0));

@@ -26,8 +26,8 @@ export default function InstallWizard() {
     <div className="center-screen">
       <div className="install">
         <header className="install-head">
-          <span className="brand">SLAWN POS</span>
-          <h1>Set up your shop</h1>
+          <span className="brand">SNEAKWISE</span>
+          <h1>Set up Sneakwise</h1>
           <p>Four short steps. Nothing is sent anywhere.</p>
           <ol className="steps">
             {stepLabels.map((label, index) => (
@@ -64,7 +64,7 @@ export default function InstallWizard() {
             <div className="stack">
               <h2>Company and branches</h2>
               <Field label="Company name">
-                <Input value={form.companyName} onChange={(event) => installer.setCompanyName(event.target.value)} placeholder="Ama's Boutique" />
+                <Input value={form.companyName} onChange={(event) => installer.setCompanyName(event.target.value)} placeholder="Sneakwise" />
               </Field>
 
               {form.branches.map((branch, index) => (

@@ -2,8 +2,8 @@ import './globals.css';
 import ServiceWorker from '../views/components/ServiceWorker';
 
 export const metadata = {
-  title: 'Slawn POS',
-  description: 'Lightweight sales tracking for boutiques'
+  title: 'Sneakwise POS',
+  description: 'Till, stock and customer tracker for Sneakwise Sneaker Boutique'
 };
 
 export const viewport = {

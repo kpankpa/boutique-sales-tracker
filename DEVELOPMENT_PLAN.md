@@ -1,4 +1,4 @@
-# Development Plan — Slawn POS
+# Development Plan — Sneakwise POS
 
 **Scope:** One company, multiple branches. Web application, browser installer, lightweight POS, authentication, small CRM. Notifications are deferred but designed for.
 

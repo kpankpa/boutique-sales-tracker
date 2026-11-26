@@ -34,7 +34,7 @@ export function usePos() {
   const [offline, setOffline] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [companyName, setCompanyName] = useState('Slawn POS');
+  const [companyName, setCompanyName] = useState('Sneakwise POS');
   const syncRun = useRef(null);
 
   const load = useCallback(async () => {
@@ -47,7 +47,7 @@ export function usePos() {
         apiGet('/stock')
       ]);
       setBranches(meta.branches);
-      setCompanyName(meta.companyName || 'Slawn POS');
+      setCompanyName(meta.companyName || 'Sneakwise POS');
       setProducts(productList);
       setCustomers(customerList);
       setSales(saleList);

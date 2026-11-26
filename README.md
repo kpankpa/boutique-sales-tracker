@@ -1,6 +1,6 @@
-# Slawn POS
+# Sneakwise POS
 
-A lightweight, multi-branch web application for a boutique in Ghana. It covers the browser installer, staff authentication, a fast point-of-sale screen, a small CRM, and owner reporting. WhatsApp/SMS notifications are intentionally deferred; the database already records events in `notification_outbox` for a future delivery worker.
+Till, stock and customer tracker for **Sneakwise**, a sneaker boutique in Ghana. It covers the browser installer, staff authentication, a fast point-of-sale screen, a small CRM, and owner reporting. WhatsApp/SMS notifications are intentionally deferred; the database already records events in `notification_outbox` for a future delivery worker.
 
 ## Current phase
 
@@ -8,8 +8,8 @@ Phase 1–4 of `DEVELOPMENT_PLAN.md` are implemented as a working prototype:
 
 - Browser installer at `/install`
 - Admin and cashier authentication with role and branch scoping
-- Product catalogue with categories and sizes (shoes, clothing, trousers/shorts, accessories)
-- Fast sale entry with size selection per style
+- Product catalogue with sneaker categories and EU sizes (sneakers, slides & sandals, apparel, bottoms, accessories)
+- Fast sale entry with size selection per pair/style
 - Dexie-backed offline outbox with replay-safe client references
 - Stock conflicts surfaced in the POS with adjust, retry and void actions
 - Stock tracking per branch and size, with opening stock, adjustments and reorder alerts
@@ -91,9 +91,10 @@ Admins also have **Admin → Stock** for deliveries, stock counts and write-offs
 
 Products have a `category` and optional `size`. Categories include preset sizes:
 
-- **Shoes**: EU sizes (38–46), custom allowed.
-- **Dresses / shirts**: XS–XXL, Free size.
-- **Trousers / shorts**: waist sizes (28–42).
+- **Sneakers**: EU sizes (36–47), custom allowed.
+- **Slides & sandals**: EU sizes (36–47).
+- **Apparel**: XS–XXL, Free size.
+- **Bottoms**: waist sizes (28–42).
 - **Accessories / Other**: no size, or custom.
 
 In Admin → Products, pick a category, enter a style code, select sizes, and save once. The app creates one SKU per size (`STYLE-SIZE`), tracks stock per branch and size, and the POS prompts for size when selling. Opening stock is applied per size.
